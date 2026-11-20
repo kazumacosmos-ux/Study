@@ -1,0 +1,381 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --text: #20263a;
+  --muted: #8991a5;
+  --line: #e9ecf3;
+  --primary: #5969d9;
+  --primary-light: #eef0ff;
+  --navy: #202944;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Noto Sans JP", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+}
+
+/* サイドバー */
+.sidebar {
+  width: 235px;
+  min-height: 100vh;
+  background: var(--navy);
+  color: white;
+  padding: 30px 18px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  padding: 0 14px;
+  margin-bottom: 48px;
+}
+
+.logo span {
+  color: #8996ff;
+}
+
+#navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-item {
+  border: none;
+  background: transparent;
+  color: #aeb8d0;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  transition: 0.2s;
+}
+
+.nav-item:hover {
+  background: #303d5d;
+  color: white;
+}
+
+.nav-item.active {
+  background: #5969d9;
+  color: white;
+  font-weight: 700;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 20px 14px 0;
+  color: #77829c;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+
+/* メイン */
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 36px 44px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: 28px;
+  margin: 0;
+  font-weight: 750;
+}
+
+#today-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 共通カード */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 22px;
+  box-shadow: 0 3px 12px rgba(30, 45, 80, 0.025);
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 18px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.primary-button {
+  border: none;
+  border-radius: 9px;
+  padding: 11px 17px;
+  background: var(--primary);
+  color: white;
+  font-weight: 650;
+}
+
+.primary-button:hover {
+  background: #4858c7;
+}
+
+.secondary-button {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 15px;
+  background: white;
+  color: var(--text);
+}
+
+/* ホーム画面 */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 18px;
+}
+
+.dashboard-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 19px;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stat-value {
+  font-size: 27px;
+  font-weight: 750;
+  margin-top: 9px;
+}
+
+/* リスト */
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.tag {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+/* 入力欄 */
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #dfe3ed;
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #dce0ff;
+  border-color: var(--primary);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+  margin-bottom: 7px;
+}
+
+/* カレンダー */
+.calendar-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.calendar-day {
+  min-height: 105px;
+  padding: 8px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: white;
+  font-size: 12px;
+}
+
+.calendar-day.today {
+  background: #f0f2ff;
+}
+
+.calendar-event {
+  margin-top: 5px;
+  padding: 4px 5px;
+  border-radius: 4px;
+  background: #e9edff;
+  color: #4e5dc5;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+/* レスポンシブ */
+@media (max-width: 850px) {
+  .sidebar {
+    width: 185px;
+    padding: 24px 12px;
+  }
+
+  .main {
+    padding: 28px 22px;
+  }
+}
+
+@media (max-width: 600px) {
+  #app {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+    padding: 12px;
+  }
+
+  .logo {
+    margin: 0 0 12px;
+    font-size: 22px;
+  }
+
+  #navigation {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .nav-item {
+    white-space: nowrap;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+
+  .main {
+    padding: 22px 14px;
+  }
+
+  .topbar {
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    font-size: 23px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid .wide {
+    grid-column: auto;
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-day {
+    min-height: 75px;
+    padding: 4px;
+    font-size: 10px;
+  }
+
+  .calendar-event {
+    font-size: 9px;
+  }
+}

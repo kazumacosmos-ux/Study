@@ -1,1 +1,41 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>Study | 学習管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="logo">Study<span>.</span></div>
+      <nav id="navigation">
+        <button class="nav-item active" data-page="home">ホーム</button>
+        <button class="nav-item" data-page="calendar">カレンダー</button>
+        <button class="nav-item" data-page="tasks">課題管理</button>
+        <button class="nav-item" data-page="materials">教材管理</button>
+        <button class="nav-item" data-page="records">学習記録</button>
+        <button class="nav-item" data-page="grades">成績分析</button>
+      </nav>
+      <div class="sidebar-footer">PERSONAL STUDY SYSTEM</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">PERSONAL LEARNING SPACE</div>
+          <h1 id="page-title">ホーム</h1>
+        </div>
+        <div id="today-label"></div>
+      </header>
+      <section id="page-content"></section>
+    </main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

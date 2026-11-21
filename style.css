@@ -1649,127 +1649,154 @@ textarea:focus {
   .task-actions { flex-direction: column; align-items: stretch; }
 }
 
-/* 日付マスの背景を週全体に通す。連続した休みでも境界線は前面に残す */
-.month-week {
-  position: relative;
-  isolation: isolate;
-}
-.month-week-backgrounds {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  pointer-events: none;
-  z-index: 0;
-}
-.month-week-background {
-  min-width: 0;
-  background: #fff;
-}
-.month-week-background.day-off {
-  background: #fce8e8;
-}
-.month-week-background.outside-month {
-  background: #fafafa;
-}
-.month-day-grid,
-.month-event-grid,
-.month-task-grid {
-  position: relative;
-  z-index: 1;
-  background-color: transparent;
-}
-.month-day,
-.month-event-hit-target.day-off,
-.month-task-cell.day-off {
-  background-color: transparent !important;
-}
-.month-day.today {
-  background-color: #f0f2ff;
-}
-.month-day.day-off.today {
-  background-color: #f8dddd !important;
-}
-.month-day.outside-month {
-  background-color: transparent !important;
-}
-.month-day.today {
-  background-color: #f0f2ff !important;
-}
-
 /* ======================================
-   月カレンダー罫線の最終調整
-   週内の全行で同じ位置に縦線を描画し、線切れ・二重線を防ぐ
+   月カレンダー罫線・背景の最終統一
+   7列の基準を曜日行と各週で共有し、線は週コンテナだけが描画する
    ====================================== */
-.month-weekdays,
-.month-week {
-  position: relative;
-  border: 0 !important;
-  background-image: none !important;
+.month-calendar {
+  --month-line: #333;
+  --month-line-width: 1.5px;
+  --month-cell-red: #fce8e8;
+  --month-cell-outside: #f4f5f7;
+  border: 0;
 }
 
 .month-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  width: 100%;
+  border: 0 !important;
+  border-left: var(--month-line-width) solid var(--month-line) !important;
+  border-right: var(--month-line-width) solid var(--month-line) !important;
+  border-top: var(--month-line-width) solid var(--month-line) !important;
+  border-bottom: var(--month-line-width) solid var(--month-line) !important;
+  background: none !important;
+  box-sizing: border-box;
+}
+
+.month-weekdays .calendar-weekday {
+  min-width: 0;
+  border: 0 !important;
+  padding: 8px 6px;
+  box-sizing: border-box;
 }
 
 .month-week {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  border: 0 !important;
+  border-left: var(--month-line-width) solid var(--month-line) !important;
+  border-right: var(--month-line-width) solid var(--month-line) !important;
+  border-bottom: var(--month-line-width) solid var(--month-line) !important;
+  box-sizing: border-box;
   isolation: isolate;
 }
 
-/* 曜日行の外枠・列境界 */
-.month-weekdays::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  border-left: 1.5px solid #333;
-  border-right: 1.5px solid #333;
-  border-bottom: 1.5px solid #333;
-  background-image: repeating-linear-gradient(
-    to right,
-    transparent 0,
-    transparent calc(100% / 7 - 1.5px),
-    #333 calc(100% / 7 - 1.5px),
-    #333 calc(100% / 7)
-  );
-}
-
-/* 週全体に一枚の罫線レイヤーを重ねる。内側の各行で線を描かない */
+/* 縦線は週全体に一度だけ描画。子要素の背景に隠れない */
 .month-week::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 8;
   pointer-events: none;
-  border-left: 1.5px solid #333;
-  border-right: 1.5px solid #333;
-  border-bottom: 1.5px solid #333;
   background-image: repeating-linear-gradient(
     to right,
     transparent 0,
-    transparent calc(100% / 7 - 1.5px),
-    #333 calc(100% / 7 - 1.5px),
-    #333 calc(100% / 7)
+    transparent calc(14.2857142857% - var(--month-line-width)),
+    var(--month-line) calc(14.2857142857% - var(--month-line-width)),
+    var(--month-line) 14.2857142857%
   );
+  background-size: 100% 100%;
 }
 
-/* 右端の二重線や行ごとのズレの原因になる個別の線を解除 */
 .month-day-grid,
 .month-event-grid,
 .month-task-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 0 !important;
+  background: none !important;
   background-image: none !important;
-  border-left: 0 !important;
-  border-right: 0 !important;
+  box-sizing: border-box;
 }
 
 .month-day,
+.month-event-hit-target,
 .month-task-cell {
-  border-left: 0 !important;
-  border-right: 0 !important;
+  min-width: 0;
+  margin: 0;
+  border: 0 !important;
+  border-radius: 0;
+  box-sizing: border-box;
+}
+
+.month-day {
+  background-color: #fff;
+}
+
+.month-day.today {
+  background-color: #f0f2ff;
+}
+
+.month-day.outside-month,
+.month-event-hit-target.outside-month,
+.month-task-cell.outside-month {
+  background-color: var(--month-cell-outside) !important;
+}
+
+.month-day.day-off,
+.month-day.day-off:hover,
+.month-event-hit-target.day-off,
+.month-task-cell.day-off {
+  background-color: var(--month-cell-red) !important;
+}
+
+.month-day.day-off.today {
+  background-color: #f8dddd !important;
+}
+
+/* 月外セルのグレーを休みの赤より優先 */
+.month-day.outside-month.day-off,
+.month-event-hit-target.outside-month.day-off,
+.month-task-cell.outside-month.day-off {
+  background-color: var(--month-cell-outside) !important;
+}
+
+.month-event-grid {
+  position: relative;
+  grid-template-rows: repeat(3, minmax(25px, auto));
+  grid-auto-flow: row;
+  row-gap: 3px;
+  padding: 2px 0 6px;
+  isolation: auto;
 }
 
 .month-event-hit-target {
-  border: 0 !important;
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background-color: transparent;
+}
+
+.month-event-bar {
+  position: relative;
+  z-index: 9;
+  min-width: 0;
+}
+
+.month-task-cell {
+  padding: 2px 4px 7px;
+  background-color: #fff;
+}
+
+.month-day.outside-month .month-day-number {
+  background: #e9ebef;
+  color: #aeb5c0;
 }

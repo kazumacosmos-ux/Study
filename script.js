@@ -891,15 +891,6 @@ function renderMonthView(year, month) {
       });
     });
 
-    // 週全体に敷く日付背景（日曜・祝日・前後月）
-    // 背景を各表示行ではなく週全体に敷くことで、途中の白い隙間を防ぐ
-    const weekBackgrounds = days.map(day => {
-      const outside = day.outside;
-      const dayOff = isDayOff(day.date, appData.events);
-      const className = outside ? "outside-month" : (dayOff ? "day-off" : "");
-      return `<span class="month-week-background ${className}"></span>`;
-    }).join("");
-
     // 日付の数字
     const dayCells = days.map(day => {
       const count = day.events.filter(item => !isClosureEvent(item)).length;
@@ -925,7 +916,7 @@ function renderMonthView(year, month) {
     const eventHitTargets = days.map((day, index) => `
       <button
         type="button"
-        class="month-event-hit-target ${isDayOff(day.date, appData.events) ? "day-off" : ""}"
+        class="month-event-hit-target ${isDayOff(day.date, appData.events) ? "day-off" : ""} ${day.outside ? "outside-month" : ""}"
         data-date="${day.key}"
         style="grid-column: ${index + 1}; grid-row: 1 / 4;"
         aria-label="${day.date.getMonth() + 1}月${day.date.getDate()}日を開く"
@@ -956,7 +947,7 @@ function renderMonthView(year, month) {
 
     // 課題
     const taskCells = days.map(day => `
-      <div class="month-task-cell ${isDayOff(day.date, appData.events) ? "day-off" : ""}"
+      <div class="month-task-cell ${isDayOff(day.date, appData.events) ? "day-off" : ""} ${day.outside ? "outside-month" : ""}"
         onclick="openCalendarDay('${day.key}')">
         ${day.tasks.map(task => `
           <div class="month-task-label">課題：${escapeHTML(task.title || task.range || "課題")}</div>
@@ -966,9 +957,6 @@ function renderMonthView(year, month) {
 
     html += `
       <div class="month-week">
-        <div class="month-week-backgrounds" aria-hidden="true">
-          ${weekBackgrounds}
-        </div>
         <div class="month-day-grid">
           ${dayCells}
         </div>

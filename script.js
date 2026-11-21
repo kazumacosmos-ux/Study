@@ -210,6 +210,7 @@ function getCategoryStyle(category) {
     "休校・休み": "event-red",
     "その他": "event-orange"
   };
+
   return styles[category] || "event-blue";
 }
 
@@ -224,8 +225,10 @@ function renderCalendar(content) {
   } else if (calendarView === "week") {
     const start = new Date(calendarDate);
     start.setDate(start.getDate() - start.getDay());
+
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
+
     heading = `${start.getMonth() + 1}/${start.getDate()} ～ ${end.getMonth() + 1}/${end.getDate()}`;
   } else {
     heading = `${year}年${month + 1}月`;
@@ -249,7 +252,9 @@ function renderCalendar(content) {
           <button class="secondary-button" onclick="goToday()">今日</button>
           <button class="secondary-button" onclick="changeCalendar(1)">→</button>
         </div>
+
         <strong class="calendar-heading">${heading}</strong>
+
         <div class="calendar-views">
           <button class="secondary-button ${calendarView === "month" ? "view-active" : ""}" onclick="setCalendarView('month')">月</button>
           <button class="secondary-button ${calendarView === "week" ? "view-active" : ""}" onclick="setCalendarView('week')">週</button>
@@ -274,58 +279,184 @@ function renderCalendar(content) {
   `;
 }
 
+// --------------------------------------
+// 月表示
+// --------------------------------------
+
 function renderMonthView(year, month) {
   const firstDay = new Date(year, month, 1).getDay();
   const lastDate = new Date(year, month + 1, 0).getDate();
   const weeks = Math.ceil((firstDay + lastDate) / 7);
   const today = todayString();
 
-  let cells = "";
+  const firstDate = new Date(year, month, 1 - firstDay);
 
-  for (let i = 0; i < weeks * 7; i++) {
-    const day = i - firstDay + 1;
-    const date = new Date(year, month, day);
-    const dateKey = dateString(date);
-    const outside = date.getMonth() !== month;
+  let html = `
+    <div class="month-calendar">
+      <div class="month-weekdays">
+        ${["日", "月", "火", "水", "木", "金", "土"].map(day =>
+          `<div class="calendar-weekday">${day}</div>`
+        ).join("")}
+      </div>
+  `;
 
-    const events = appData.events.filter(item => eventOccursOn(item, dateKey));
-    const tasks = appData.tasks.filter(item => item.dueDate === dateKey);
+  for (let week = 0; week < weeks; week++) {
+    const weekStart = new Date(firstDate);
+    weekStart.setDate(firstDate.getDate() + week * 7);
 
-    cells += `
-      <div class="calendar-day calendar-day-clickable ${dateKey === today ? "today" : ""} ${outside ? "outside-month" : ""}"
-        onclick="openCalendarDay('${dateKey}')"
-        role="button" tabindex="0"
-        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openCalendarDay('${dateKey}')}">
+    const days = [];
+    const weekDates = [];
 
-        <button class="calendar-date" type="button" onclick="event.stopPropagation();openCalendarDay('${dateKey}')">
-          ${date.getDate()}
-        </button>
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
 
-        ${events.map(item => `
-          <button type="button" class="calendar-event ${getCategoryStyle(item.category)}"
-            onclick="event.stopPropagation();openCalendarDay('${dateKey}')">
-            ${escapeHTML(item.title)}
-          </button>
-        `).join("")}
+      const key = dateString(date);
+      weekDates.push(key);
 
-        ${tasks.map(item => `
-          <div class="calendar-event event-task">
-            課題：${escapeHTML(item.title)}
+      const events = appData.events.filter(item =>
+        eventOccursOn(item, key)
+      );
+
+      const tasks = appData.tasks.filter(item => item.dueDate === key);
+
+      days.push({
+        date,
+        key,
+        events,
+        tasks,
+        outside: date.getMonth() !== month
+      });
+    }
+
+    // この週に関係する予定を取得
+    const weekEvents = appData.events
+      .filter(item =>
+        getEventStart(item) <= weekDates[6] &&
+        getEventEnd(item) >= weekDates[0]
+      )
+      .sort((a, b) => {
+        const startCompare = getEventStart(a).localeCompare(getEventStart(b));
+        if (startCompare !== 0) return startCompare;
+        return getEventEnd(a).localeCompare(getEventEnd(b));
+      });
+
+    // 予定を最大3段に配置
+    const lanes = [[], [], []];
+    const visibleEvents = [];
+
+    weekEvents.forEach(item => {
+      const start = getEventStart(item);
+      const end = getEventEnd(item);
+
+      const foundStart = weekDates.findIndex(date => date >= start);
+      const startIndex = foundStart === -1 ? 7 : foundStart;
+
+      let endIndex = weekDates.findIndex(date => date > end);
+      endIndex = endIndex === -1 ? 6 : endIndex - 1;
+
+      if (startIndex > 6 || endIndex < 0) return;
+
+      let laneIndex = -1;
+
+      for (let lane = 0; lane < 3; lane++) {
+        const collision = lanes[lane].some(range =>
+          !(endIndex < range.start || startIndex > range.end)
+        );
+
+        if (!collision) {
+          laneIndex = lane;
+          break;
+        }
+      }
+
+      if (laneIndex === -1) return;
+
+      lanes[laneIndex].push({
+        start: startIndex,
+        end: endIndex
+      });
+
+      visibleEvents.push({
+        item,
+        startIndex,
+        endIndex,
+        laneIndex
+      });
+    });
+
+    // 日付の数字
+    const dayCells = days.map(day => {
+      const count = day.events.length;
+
+      return `
+        <div class="month-day ${day.key === today ? "today" : ""} ${day.outside ? "outside-month" : ""}"
+          onclick="openCalendarDay('${day.key}')"
+          role="button"
+          tabindex="0"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openCalendarDay('${day.key}')}">
+
+          <div class="month-day-heading">
+            <span class="month-day-number">${day.date.getDate()}</span>
+            ${count > 3 ? `<span class="month-overflow">4つ以上</span>` : ""}
           </div>
+        </div>
+      `;
+    }).join("");
+
+    // 予定の帯
+    const eventBars = visibleEvents.map(({ item, startIndex, endIndex, laneIndex }) => {
+      const span = endIndex - startIndex + 1;
+      const continuesBefore = getEventStart(item) < weekDates[startIndex];
+      const continuesAfter = getEventEnd(item) > weekDates[endIndex];
+
+      return `
+        <button
+          type="button"
+          class="month-event-bar ${getCategoryStyle(item.category)}
+            ${continuesBefore ? "continues-before" : ""}
+            ${continuesAfter ? "continues-after" : ""}"
+          style="grid-column: ${startIndex + 1} / span ${span}; grid-row: ${laneIndex + 1};"
+          onclick="event.stopPropagation();openCalendarDay('${weekDates[startIndex]}')"
+          title="${escapeHTML(item.title)}">
+          ${escapeHTML(item.title)}
+        </button>
+      `;
+    }).join("");
+
+    // 課題
+    const taskCells = days.map(day => `
+      <div class="month-task-cell">
+        ${day.tasks.map(task => `
+          <div class="month-task-label">課題：${escapeHTML(task.title)}</div>
         `).join("")}
+      </div>
+    `).join("");
+
+    html += `
+      <div class="month-week">
+        <div class="month-day-grid">
+          ${dayCells}
+        </div>
+
+        <div class="month-event-grid">
+          ${eventBars}
+        </div>
+
+        <div class="month-task-grid">
+          ${taskCells}
+        </div>
       </div>
     `;
   }
 
-  return `
-    <div class="calendar-grid">
-      ${["日", "月", "火", "水", "木", "金", "土"].map(day => `
-        <div class="calendar-weekday">${day}</div>
-      `).join("")}
-      ${cells}
-    </div>
-  `;
+  html += `</div>`;
+  return html;
 }
+
+// --------------------------------------
+// 週表示・日表示
+// --------------------------------------
 
 function renderWeekView() {
   const start = new Date(calendarDate);
@@ -348,7 +479,11 @@ function renderDayView() {
 
 function renderDayColumn(date) {
   const dateKey = dateString(date);
-  const events = appData.events.filter(item => eventOccursOn(item, dateKey));
+
+  const events = appData.events.filter(item =>
+    eventOccursOn(item, dateKey)
+  );
+
   const tasks = appData.tasks.filter(item => item.dueDate === dateKey);
 
   return `
@@ -366,10 +501,14 @@ function renderDayColumn(date) {
       `).join("") : `<p class="muted">予定はありません。</p>`}
 
       ${tasks.map(item => `
-        <div class="calendar-event event-task">課題：${escapeHTML(item.title)}</div>
+        <div class="calendar-event event-task">
+          課題：${escapeHTML(item.title)}
+        </div>
       `).join("")}
 
-      <button class="secondary-button" onclick="openCalendarDay('${dateKey}')">この日の予定を見る</button>
+      <button class="secondary-button" onclick="openCalendarDay('${dateKey}')">
+        この日の予定を見る
+      </button>
     </div>
   `;
 }
@@ -412,23 +551,35 @@ function renderCalendarDay() {
 
   const content = document.getElementById("page-content");
   const date = parseDate(selectedDate);
-  const events = appData.events.filter(item => eventOccursOn(item, selectedDate));
+
+  const events = appData.events.filter(item =>
+    eventOccursOn(item, selectedDate)
+  );
+
   const tasks = appData.tasks.filter(item => item.dueDate === selectedDate);
 
   content.innerHTML = `
     <div class="card calendar-detail-page">
       <div class="calendar-detail-header">
-        <button class="secondary-button" onclick="showPage('calendar')">← カレンダーに戻る</button>
-        <button class="primary-button" onclick="openEventForm()">＋ 予定を追加</button>
+        <button class="secondary-button" onclick="showPage('calendar')">
+          ← カレンダーに戻る
+        </button>
+
+        <button class="primary-button" onclick="openEventForm()">
+          ＋ 予定を追加
+        </button>
       </div>
 
       <div class="calendar-detail-date">
         <div class="eyebrow">DAILY SCHEDULE</div>
         <h2>${formatDate(date)}</h2>
-        <p class="muted">${["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"][date.getDay()]}</p>
+        <p class="muted">
+          ${["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"][date.getDay()]}
+        </p>
       </div>
 
       <h3 class="card-title">予定 ${events.length}件</h3>
+
       <div class="item-list">
         ${events.length ? events.map(item => `
           <button class="event-detail-row" onclick="openEventDetail(${item.id})">
@@ -442,6 +593,7 @@ function renderCalendarDay() {
       ${tasks.length ? `
         <div class="calendar-day-tasks">
           <h3 class="card-title">期限がこの日の課題</h3>
+
           ${tasks.map(item => `
             <div class="list-item">
               <strong>${escapeHTML(item.title)}</strong>
@@ -467,6 +619,7 @@ function renderEventForm() {
   showCalendarScreen(editingEventId === null ? "予定を追加" : "予定を編集");
 
   const content = document.getElementById("page-content");
+
   const item = editingEventId === null
     ? null
     : appData.events.find(event => event.id === editingEventId);
@@ -491,35 +644,55 @@ function renderEventForm() {
   content.innerHTML = `
     <div class="card event-form-card">
       <div class="event-form-header">
-        <button class="secondary-button" onclick="cancelEventForm()">← 戻る</button>
+        <button class="secondary-button" onclick="cancelEventForm()">
+          ← 戻る
+        </button>
+
         <h2 class="card-title">${item ? "予定を編集" : "新しい予定"}</h2>
       </div>
 
       <form id="event-form" class="event-form">
         <div class="form-field">
           <label for="event-title">予定名</label>
-          <input id="event-title" name="title" type="text"
-            placeholder="例：数学の小テスト" maxlength="100"
-            value="${escapeHTML(item?.title || "")}" required>
+          <input
+            id="event-title"
+            name="title"
+            type="text"
+            placeholder="例：数学の小テスト"
+            maxlength="100"
+            value="${escapeHTML(item?.title || "")}"
+            required>
         </div>
 
         <div class="event-date-range">
           <div class="form-field">
             <label for="event-start-date">開始日</label>
-            <input id="event-start-date" name="startDate" type="date"
-              value="${escapeHTML(startDate)}" required>
+            <input
+              id="event-start-date"
+              name="startDate"
+              type="date"
+              value="${escapeHTML(startDate)}"
+              required>
           </div>
 
           <div class="form-field">
             <label for="event-end-date">終了日</label>
-            <input id="event-end-date" name="endDate" type="date"
-              value="${escapeHTML(endDate)}" required>
+            <input
+              id="event-end-date"
+              name="endDate"
+              type="date"
+              value="${escapeHTML(endDate)}"
+              required>
           </div>
         </div>
 
         <div class="form-field">
           <label class="all-day-label">
-            <input id="event-all-day" name="allDay" type="checkbox" ${isAllDay ? "checked" : ""}>
+            <input
+              id="event-all-day"
+              name="allDay"
+              type="checkbox"
+              ${isAllDay ? "checked" : ""}>
             終日
           </label>
         </div>
@@ -527,25 +700,41 @@ function renderEventForm() {
         <div id="event-time-fields" class="event-time-fields" ${isAllDay ? "hidden" : ""}>
           <div class="form-field">
             <label for="event-start-time">開始時刻</label>
-            <input id="event-start-time" name="startTime" type="time"
-              value="${escapeHTML(item?.startTime || "")}" ${isAllDay ? "disabled" : ""}>
+            <input
+              id="event-start-time"
+              name="startTime"
+              type="time"
+              value="${escapeHTML(item?.startTime || "")}"
+              ${isAllDay ? "disabled" : ""}>
           </div>
 
           <div class="form-field">
             <label for="event-end-time">終了時刻</label>
-            <input id="event-end-time" name="endTime" type="time"
-              value="${escapeHTML(item?.endTime || "")}" ${isAllDay ? "disabled" : ""}>
+            <input
+              id="event-end-time"
+              name="endTime"
+              type="time"
+              value="${escapeHTML(item?.endTime || "")}"
+              ${isAllDay ? "disabled" : ""}>
           </div>
         </div>
 
         <div class="form-field">
           <label>カテゴリー</label>
+
           <div class="event-category-options">
             ${categories.map((category, index) => `
               <label class="event-category-option">
-                <input type="radio" name="category" value="${category}"
-                  ${item ? (item.category === category ? "checked" : "") : (index === 0 ? "checked" : "")}>
-                <span class="event-category-chip ${getCategoryStyle(category)}">${category}</span>
+                <input
+                  type="radio"
+                  name="category"
+                  value="${category}"
+                  ${item
+                    ? (item.category === category ? "checked" : "")
+                    : (index === 0 ? "checked" : "")}>
+                <span class="event-category-chip ${getCategoryStyle(category)}">
+                  ${category}
+                </span>
               </label>
             `).join("")}
           </div>
@@ -553,13 +742,21 @@ function renderEventForm() {
 
         <div class="form-field">
           <label for="event-memo">メモ <span class="muted">（任意）</span></label>
-          <textarea id="event-memo" name="memo" rows="4"
+          <textarea
+            id="event-memo"
+            name="memo"
+            rows="4"
             placeholder="予定についてのメモ">${escapeHTML(item?.memo || "")}</textarea>
         </div>
 
         <div class="event-form-actions">
-          <button type="button" class="secondary-button" onclick="cancelEventForm()">キャンセル</button>
-          <button type="submit" class="primary-button">${item ? "変更を保存" : "予定を保存"}</button>
+          <button type="button" class="secondary-button" onclick="cancelEventForm()">
+            キャンセル
+          </button>
+
+          <button type="submit" class="primary-button">
+            ${item ? "変更を保存" : "予定を保存"}
+          </button>
         </div>
       </form>
     </div>
@@ -572,6 +769,7 @@ function renderEventForm() {
 
   allDayCheckbox.addEventListener("change", () => {
     const allDay = allDayCheckbox.checked;
+
     timeFields.hidden = allDay;
     startTimeInput.disabled = allDay;
     endTimeInput.disabled = allDay;
@@ -585,12 +783,15 @@ function saveEventForm(event) {
   event.preventDefault();
 
   const form = event.currentTarget;
+
   const title = form.elements.title.value.trim();
   const startDate = form.elements.startDate.value;
   const endDate = form.elements.endDate.value;
   const allDay = form.elements.allDay.checked;
+
   const startTime = allDay ? "" : form.elements.startTime.value;
   const endTime = allDay ? "" : form.elements.endTime.value;
+
   const categoryInput = form.querySelector('input[name="category"]:checked');
   const category = categoryInput ? categoryInput.value : "";
   const memo = form.elements.memo.value.trim();
@@ -629,6 +830,7 @@ function saveEventForm(event) {
     });
   } else {
     const index = appData.events.findIndex(item => item.id === editingEventId);
+
     if (index === -1) return;
 
     appData.events[index] = {
@@ -673,13 +875,16 @@ function renderEventDetail() {
   showCalendarScreen("予定の詳細");
 
   const content = document.getElementById("page-content");
+
   const startDate = getEventStart(item);
   const endDate = getEventEnd(item);
+
   const dateText = startDate === endDate
     ? formatDate(parseDate(startDate))
     : `${formatDate(parseDate(startDate))} ～ ${formatDate(parseDate(endDate))}`;
 
   let timeText = "終日";
+
   if (item.allDay === false) {
     if (item.startTime && item.endTime) {
       timeText = `${item.startTime} ～ ${item.endTime}`;
@@ -694,10 +899,13 @@ function renderEventDetail() {
 
   content.innerHTML = `
     <div class="card event-detail-page">
-      <button class="secondary-button" onclick="renderCalendarDay()">← 予定一覧に戻る</button>
+      <button class="secondary-button" onclick="renderCalendarDay()">
+        ← 予定一覧に戻る
+      </button>
 
       <div class="event-detail-main">
         <span class="event-color-mark large ${getCategoryStyle(item.category)}"></span>
+
         <div>
           <div class="muted">${escapeHTML(item.category || "その他")}</div>
           <h2>${escapeHTML(item.title)}</h2>
@@ -714,8 +922,13 @@ function renderEventDetail() {
       ` : ""}
 
       <div class="event-detail-actions">
-        <button class="primary-button" onclick="openEventForm(${item.id})">編集する</button>
-        <button class="secondary-button danger-button" onclick="deleteEvent(${item.id})">削除する</button>
+        <button class="primary-button" onclick="openEventForm(${item.id})">
+          編集する
+        </button>
+
+        <button class="secondary-button danger-button" onclick="deleteEvent(${item.id})">
+          削除する
+        </button>
       </div>
     </div>
   `;
@@ -728,6 +941,7 @@ function deleteEvent(id) {
   if (!confirm(`「${item.title}」を削除しますか？`)) return;
 
   appData.events = appData.events.filter(event => event.id !== id);
+
   saveData();
   renderCalendarDay();
 }
@@ -743,20 +957,27 @@ function renderTasks(content) {
         <h2 class="card-title">課題一覧</h2>
         <button class="primary-button" onclick="addTask()">＋ 課題を追加</button>
       </div>
+
       <div class="item-list">
         ${appData.tasks.length ? appData.tasks.map((item, index) => `
           <div class="list-item">
             <div>
               <strong>${escapeHTML(item.title)}</strong>
-              <div class="muted">${escapeHTML(item.subject || "未分類")} ・ 期限：${escapeHTML(item.dueDate || "未設定")}</div>
+              <div class="muted">
+                ${escapeHTML(item.subject || "未分類")} ・ 期限：${escapeHTML(item.dueDate || "未設定")}
+              </div>
             </div>
+
             <div>
               <select onchange="changeTaskStatus(${index}, this.value)">
                 <option value="notStarted" ${item.status === "notStarted" ? "selected" : ""}>未着手</option>
                 <option value="inProgress" ${item.status === "inProgress" ? "selected" : ""}>進行中</option>
                 <option value="completed" ${item.status === "completed" ? "selected" : ""}>完了</option>
               </select>
-              <button class="secondary-button" onclick="deleteTask(${index})">削除</button>
+
+              <button class="secondary-button" onclick="deleteTask(${index})">
+                削除
+              </button>
             </div>
           </div>
         `).join("") : `<p class="muted">まだ課題は登録されていません。</p>`}
@@ -791,14 +1012,18 @@ function addTask() {
 
 function changeTaskStatus(index, status) {
   if (!appData.tasks[index]) return;
+
   appData.tasks[index].status = status;
+
   saveData();
   showPage("tasks");
 }
 
 function deleteTask(index) {
   if (!confirm("この課題を削除しますか？")) return;
+
   appData.tasks.splice(index, 1);
+
   saveData();
   showPage("tasks");
 }
@@ -814,14 +1039,20 @@ function renderMaterials(content) {
         <h2 class="card-title">教材一覧</h2>
         <button class="primary-button" onclick="addMaterial()">＋ 教材を追加</button>
       </div>
+
       <div class="item-list">
         ${appData.materials.length ? appData.materials.map((item, index) => `
           <div class="list-item">
             <div>
               <strong>${escapeHTML(item.title)}</strong>
-              <div class="muted">${escapeHTML(item.subject || "未分類")} ・ ${escapeHTML(item.type || "教材")}</div>
+              <div class="muted">
+                ${escapeHTML(item.subject || "未分類")} ・ ${escapeHTML(item.type || "教材")}
+              </div>
             </div>
-            <button class="secondary-button" onclick="deleteMaterial(${index})">削除</button>
+
+            <button class="secondary-button" onclick="deleteMaterial(${index})">
+              削除
+            </button>
           </div>
         `).join("") : `<p class="muted">教材はまだ登録されていません。</p>`}
       </div>
@@ -849,7 +1080,9 @@ function addMaterial() {
 
 function deleteMaterial(index) {
   if (!confirm("この教材を削除しますか？")) return;
+
   appData.materials.splice(index, 1);
+
   saveData();
   showPage("materials");
 }
@@ -860,7 +1093,8 @@ function deleteMaterial(index) {
 
 function renderRecords(content) {
   const total = appData.records.reduce(
-    (sum, item) => sum + Number(item.minutes || 0), 0
+    (sum, item) => sum + Number(item.minutes || 0),
+    0
   );
 
   content.innerHTML = `
@@ -869,6 +1103,7 @@ function renderRecords(content) {
         <div class="stat-label">累計学習時間</div>
         <div class="stat-value">${Math.floor(total / 60)}時間${total % 60}分</div>
       </div>
+
       <div class="stat-card">
         <div class="stat-label">記録件数</div>
         <div class="stat-value">${appData.records.length}件</div>
@@ -880,13 +1115,17 @@ function renderRecords(content) {
         <h2 class="card-title">学習記録</h2>
         <button class="primary-button" onclick="addRecord()">＋ 記録する</button>
       </div>
+
       <div class="item-list">
         ${appData.records.length ? appData.records.slice().reverse().map(item => `
           <div class="list-item">
             <div>
               <strong>${escapeHTML(item.subject || "自主学習")}</strong>
-              <div class="muted">${escapeHTML(item.date)} ・ ${escapeHTML(item.note || "")}</div>
+              <div class="muted">
+                ${escapeHTML(item.date)} ・ ${escapeHTML(item.note || "")}
+              </div>
             </div>
+
             <span class="tag">${Number(item.minutes)}分</span>
           </div>
         `).join("") : `<p class="muted">学習記録はまだありません。</p>`}
@@ -900,6 +1139,7 @@ function addRecord() {
   if (subject === null) return;
 
   const minutes = Number(prompt("学習時間を分単位で入力してください"));
+
   if (!Number.isFinite(minutes) || minutes <= 0) {
     alert("正しい学習時間を入力してください。");
     return;
@@ -930,13 +1170,17 @@ function renderGrades(content) {
         <h2 class="card-title">成績一覧</h2>
         <button class="primary-button" onclick="addGrade()">＋ 成績を追加</button>
       </div>
+
       <div class="item-list">
         ${appData.grades.length ? appData.grades.map(item => `
           <div class="list-item">
             <div>
               <strong>${escapeHTML(item.subject)}</strong>
-              <div class="muted">${escapeHTML(item.testName)} ・ ${escapeHTML(item.date)}</div>
+              <div class="muted">
+                ${escapeHTML(item.testName)} ・ ${escapeHTML(item.date)}
+              </div>
             </div>
+
             <span class="tag">${escapeHTML(item.score)}点</span>
           </div>
         `).join("") : `<p class="muted">成績はまだ登録されていません。</p>`}
@@ -953,12 +1197,16 @@ function addGrade() {
   if (!testName) return;
 
   const score = Number(prompt("点数を入力してください"));
+
   if (!Number.isFinite(score) || score < 0) {
     alert("正しい点数を入力してください。");
     return;
   }
 
-  const date = prompt("テスト日を入力してください（例：2026-11-20）", todayString());
+  const date = prompt(
+    "テスト日を入力してください（例：2026-11-20）",
+    todayString()
+  );
 
   appData.grades.push({
     id: Date.now(),

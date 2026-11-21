@@ -5,6 +5,24 @@
 
 let appData = StudyStorage.load();
 
+// Firebase同期設定
+const firebaseConfig = {
+  apiKey: "AIzaSyD0emj0nw9RTp8COfdSoUFqAgVjD2LNAcQ",
+  authDomain: "study-ecd4a.firebaseapp.com",
+  databaseURL: "https://study-ecd4a-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "study-ecd4a",
+  storageBucket: "study-ecd4a.firebasestorage.app",
+  messagingSenderId: "411981535833",
+  appId: "1:411981535833:web:c06a4a7d1be077e5e9ef48"
+};
+
+let firebaseAuth = null;
+let firebaseDatabase = null;
+let cloudUser = null;
+let cloudReady = false;
+let remoteListener = null;
+let authMode = "login";
+
 const pageNames = {
   home: "ホーム",
   calendar: "カレンダー",
@@ -53,8 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupCalendarInteractions();
   setupZoomPrevention();
   setupCalendarStyles();
-
-  showPage("home");
+  setupFirebaseSync();
 });
 
 // --------------------------------------
@@ -63,6 +80,153 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function saveData() {
   StudyStorage.save(appData);
+  if (!cloudReady || !cloudUser || !firebaseDatabase) return;
+  const payload = JSON.parse(JSON.stringify(appData));
+  firebaseDatabase.ref(`study/${cloudUser.uid}`).set(payload).catch(error => {
+    console.error("クラウドへの保存に失敗しました", error);
+    showSyncNotice("クラウドへの保存に失敗しました。通信状態を確認してください。");
+  });
+}
+
+function showSyncNotice(message) {
+  let notice = document.getElementById("study-sync-notice");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "study-sync-notice";
+    notice.className = "sync-notice";
+    document.body.appendChild(notice);
+  }
+  notice.textContent = message;
+  notice.hidden = false;
+}
+
+function hideSyncNotice() {
+  const notice = document.getElementById("study-sync-notice");
+  if (notice) notice.hidden = true;
+}
+
+function renderAuthScreen(message = "") {
+  const screen = document.getElementById("auth-screen");
+  document.getElementById("app").hidden = true;
+  screen.hidden = false;
+  screen.innerHTML = `
+    <div class="auth-card">
+      <div class="auth-logo">Study<span>.</span></div>
+      <h1>${authMode === "signup" ? "アカウント作成" : "ログイン"}</h1>
+      <p class="auth-description">iPadとスマホで同じアカウントを使うと、データが自動で同期されます。</p>
+      <form id="auth-form">
+        <label>メールアドレス<input id="auth-email" type="email" autocomplete="email" required></label>
+        <label>パスワード<input id="auth-password" type="password" minlength="6" autocomplete="${authMode === "signup" ? "new-password" : "current-password"}" required></label>
+        <button class="primary-button" type="submit">${authMode === "signup" ? "アカウントを作成" : "ログイン"}</button>
+      </form>
+      <p id="auth-error" class="auth-error">${escapeHTML(message)}</p>
+      <button type="button" id="auth-mode-button" class="auth-mode-button">${authMode === "signup" ? "すでにアカウントを持っている場合はログイン" : "初めて使う場合はアカウントを作成"}</button>
+    </div>`;
+
+  document.getElementById("auth-mode-button").addEventListener("click", () => {
+    authMode = authMode === "signup" ? "login" : "signup";
+    renderAuthScreen();
+  });
+  document.getElementById("auth-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const email = document.getElementById("auth-email").value.trim();
+    const password = document.getElementById("auth-password").value;
+    const errorBox = document.getElementById("auth-error");
+    const submit = event.currentTarget.querySelector("button[type=submit]");
+    submit.disabled = true;
+    errorBox.textContent = "処理中…";
+    try {
+      if (authMode === "signup") await firebaseAuth.createUserWithEmailAndPassword(email, password);
+      else await firebaseAuth.signInWithEmailAndPassword(email, password);
+    } catch (error) {
+      const messages = {
+        "auth/email-already-in-use": "このメールアドレスは既に登録されています。ログインしてください。",
+        "auth/invalid-email": "メールアドレスの形式を確認してください。",
+        "auth/weak-password": "パスワードは6文字以上にしてください。",
+        "auth/invalid-credential": "メールアドレスまたはパスワードが違います。",
+        "auth/user-not-found": "アカウントが見つかりません。先にアカウントを作成してください。",
+        "auth/network-request-failed": "通信に失敗しました。ネットワークを確認してください。"
+      };
+      errorBox.textContent = messages[error.code] || `エラーが発生しました（${error.code || "不明"}）。`;
+      submit.disabled = false;
+    }
+  });
+}
+
+function setupFirebaseSync() {
+  try {
+    if (!window.firebase) throw new Error("Firebase SDKを読み込めませんでした。通信環境を確認してください。");
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    firebaseAuth = firebase.auth();
+    firebaseDatabase = firebase.database();
+    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    document.getElementById("logout-button").addEventListener("click", async () => {
+      if (!confirm("ログアウトしますか？")) return;
+      await firebaseAuth.signOut();
+    });
+    firebaseAuth.onAuthStateChanged(async user => {
+      cloudReady = false;
+      if (remoteListener && cloudUser) {
+        firebaseDatabase.ref(`study/${cloudUser.uid}`).off("value", remoteListener);
+        remoteListener = null;
+      }
+      cloudUser = user;
+      if (!user) {
+        renderAuthScreen();
+        return;
+      }
+      document.getElementById("auth-screen").hidden = true;
+      document.getElementById("app").hidden = false;
+      try {
+        const userRef = firebaseDatabase.ref(`study/${user.uid}`);
+        const snapshot = await userRef.once("value");
+        if (snapshot.exists()) {
+          appData = normalizeStudyData(snapshot.val());
+          StudyStorage.save(appData);
+        } else {
+          // 初回接続時のみ、この端末に保存されている既存データをクラウドへ移行
+          appData = StudyStorage.load();
+          await userRef.set(appData);
+        }
+        cloudReady = true;
+        remoteListener = snapshot => {
+          if (!snapshot.exists()) return;
+          appData = normalizeStudyData(snapshot.val());
+          StudyStorage.save(appData);
+          if (currentPage) showPage(currentPage);
+          hideSyncNotice();
+        };
+        userRef.on("value", remoteListener, error => {
+          console.error("同期の受信に失敗しました", error);
+          showSyncNotice("同期の受信に失敗しました。Firebaseのルールを確認してください。");
+        });
+        showPage("home");
+      } catch (error) {
+        console.error("Studyデータの同期準備に失敗しました", error);
+        showSyncNotice("データを読み込めませんでした。Firebaseのルールと通信状態を確認してください。");
+        showPage("home");
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    renderAuthScreen(error.message || "Firebaseの初期化に失敗しました。");
+  }
+}
+
+function normalizeStudyData(value) {
+  const defaults = JSON.parse(JSON.stringify(studyData));
+  const source = value && typeof value === "object" ? value : {};
+  const timetable = source.timetable || {};
+  return {
+    events: Array.isArray(source.events) ? source.events : [],
+    tasks: Array.isArray(source.tasks) ? source.tasks : [],
+    todos: Array.isArray(source.todos) ? source.todos : [],
+    timetable: {
+      weekly: { ...defaults.timetable.weekly, ...(timetable.weekly || {}) },
+      changes: Array.isArray(timetable.changes) ? timetable.changes : [],
+      enabled: timetable.enabled !== false
+    }
+  };
 }
 
 function formatDate(date) {

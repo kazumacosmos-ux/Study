@@ -9,7 +9,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
+  <section id="auth-screen" class="auth-screen" hidden></section>
+  <div id="app" hidden>
     <aside class="sidebar">
       <div class="logo">Study<span>.</span></div>
       <nav id="navigation">
@@ -28,12 +29,18 @@
           <div class="eyebrow">PERSONAL LEARNING SPACE</div>
           <h1 id="page-title">ホーム</h1>
         </div>
-        <div id="today-label"></div>
+        <div class="topbar-actions">
+          <div id="today-label"></div>
+          <button type="button" id="logout-button" class="secondary-button">ログアウト</button>
+        </div>
       </header>
       <section id="page-content"></section>
     </main>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
   <script src="data.js"></script>
   <script src="script.js"></script>
 </body>

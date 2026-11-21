@@ -1953,3 +1953,52 @@ textarea:focus {
   height: 18px;
   accent-color: var(--primary);
 }
+
+/* Firebaseログイン */
+[hidden] { display: none !important; }
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.auth-card {
+  width: min(100%, 430px);
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(32, 41, 68, .08);
+}
+.auth-logo { font-size: 25px; font-weight: 800; color: var(--navy); }
+.auth-logo span { color: var(--primary); }
+.auth-card h1 { margin: 18px 0 8px; font-size: 23px; }
+.auth-description { color: var(--muted); line-height: 1.7; font-size: 14px; }
+#auth-form { display: grid; gap: 15px; margin-top: 22px; }
+#auth-form label { display: grid; gap: 7px; font-size: 14px; font-weight: 600; }
+#auth-form input {
+  width: 100%; min-width: 0; padding: 12px 13px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: #fff; color: var(--text); font: inherit;
+}
+#auth-form .primary-button { width: 100%; margin-top: 5px; }
+.auth-error { min-height: 22px; color: #c0392b; font-size: 13px; line-height: 1.5; }
+.auth-mode-button {
+  border: 0; padding: 8px 0; background: transparent;
+  color: var(--primary); font-size: 13px; text-align: left;
+}
+.topbar-actions { display: flex; align-items: center; gap: 14px; }
+.topbar-actions .secondary-button { white-space: nowrap; }
+.sync-notice {
+  position: fixed; z-index: 1000; left: 50%; bottom: 18px;
+  transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
+  padding: 11px 15px; border-radius: 10px; background: #fff1f0;
+  color: #a93226; border: 1px solid #f5c6c2; font-size: 13px;
+  box-shadow: 0 5px 20px rgba(0,0,0,.08);
+}
+@media (max-width: 600px) {
+  .auth-card { padding: 23px; }
+  .topbar-actions { align-items: flex-end; flex-direction: column; gap: 7px; }
+}

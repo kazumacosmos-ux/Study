@@ -1165,21 +1165,63 @@ textarea:focus {
   margin-bottom: 22px;
 }
 
+.timetable-week-navigation {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.timetable-week-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.timetable-week-heading .card-title {
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+}
+
+.timetable-week-button {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.timetable-current-week {
+  border: 0;
+  padding: 3px 10px;
+  border-radius: 20px;
+  color: var(--primary);
+  background: var(--primary-light);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.timetable-main-subtitle {
+  margin: 0 0 10px;
+}
+
 .timetable-scroll {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .timetable-table {
   width: 100%;
-  min-width: 560px;
+  min-width: 680px;
   border-collapse: separate;
-  border-spacing: 5px;
+  border-spacing: 4px;
   table-layout: fixed;
 }
 
 .timetable-table th {
-  padding: 10px 5px;
+  padding: 8px 3px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -1187,41 +1229,85 @@ textarea:focus {
 }
 
 .timetable-table .timetable-period {
-  width: 58px;
+  width: 52px;
   color: var(--text);
   white-space: nowrap;
 }
 
 .timetable-table td {
-  height: 58px;
+  height: 54px;
   padding: 0;
 }
 
+.timetable-day-name,
+.timetable-day-date {
+  display: block;
+}
+
+.timetable-day-name {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.timetable-day-date {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* 上部の時間割表は表示専用 */
 .timetable-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  min-height: 52px;
-  padding: 7px 4px;
+  min-height: 50px;
+  padding: 6px 3px;
   border: 1px solid #e5e9f1;
   border-radius: 8px;
   background: #fafbfe;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
+  text-align: center;
   overflow-wrap: anywhere;
 }
 
-.timetable-cell:hover {
-  border-color: var(--primary);
-  background: var(--primary-light);
-}
-
-.timetable-empty {
+.timetable-cell.is-no-class {
+  color: #b8bfcc;
+  font-size: 17px;
+  font-weight: 400;
   background: #f7f8fb;
-  border-radius: 8px;
 }
 
-.timetable-note {
-  margin: 12px 0 0;
-  font-size: 12px;
+/* 日付・時限を指定して変更したコマ */
+.timetable-cell.is-changed {
+  border: 2px solid #7b89df;
+  background: #f8f8ff;
+}
+
+.timetable-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.timetable-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timetable-legend-outline {
+  display: inline-block;
+  width: 17px;
+  height: 13px;
+  border: 2px solid #7b89df;
+  border-radius: 4px;
+  background: #f8f8ff;
 }
 
 .timetable-change-form {
@@ -1257,40 +1343,37 @@ textarea:focus {
   flex-shrink: 0;
 }
 
-.timetable-preview-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.timetable-preview-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 46px;
-  padding: 9px 12px;
-  border: 1px solid #e8ebf2;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.timetable-preview-period {
-  width: 38px;
-  color: var(--muted);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.timetable-preview-row.is-changed {
-  border: 2px solid #7b89df;
-  background: #f8f8ff;
-}
-
-.timetable-changed-label {
-  margin-left: auto;
-  color: #5969d9;
-  font-size: 11px;
+.timetable-settings-card summary {
+  cursor: pointer;
+  color: var(--text);
+  font-size: 15px;
   font-weight: 700;
+}
+
+.timetable-settings-card[open] summary {
+  margin-bottom: 12px;
+}
+
+.timetable-settings-table {
+  min-width: 680px;
+}
+
+.timetable-setting-input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 5px 3px;
+  border: 1px solid #e5e9f1;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+  text-align: center;
+  font: inherit;
+  font-size: 12px;
+}
+
+.timetable-settings-save {
+  margin-top: 14px;
 }
 
 .calendar-return-group {
@@ -1341,5 +1424,22 @@ textarea:focus {
   .timetable-change-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .timetable-week-navigation {
+    gap: 5px;
+  }
+
+  .timetable-week-button {
+    padding: 8px 9px;
+    font-size: 11px;
+  }
+
+  .timetable-week-button span {
+    display: none;
+  }
+
+  .timetable-week-heading .card-title {
+    font-size: 13px;
   }
 }

@@ -30,6 +30,9 @@ let calendarReturnScrollY = 0;
 // コピー通知用
 let copyToastTimer = null;
 
+// 時間割の表示週（月曜日を基準）
+let timetableWeekStart = null;
+
 // --------------------------------------
 // 初期化
 // --------------------------------------
@@ -1520,6 +1523,17 @@ const timetableDays = [
   { number: 6, name: "土" }
 ];
 
+function getMonday(date) {
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = result.getDay();
+  result.setDate(result.getDate() - (day === 0 ? 6 : day - 1));
+  return result;
+}
+
+function formatShortDate(date) {
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
 function ensureTimetableData() {
   if (!appData.timetable) {
     appData.timetable = JSON.parse(JSON.stringify(studyData.timetable));
@@ -1531,14 +1545,14 @@ function ensureTimetableData() {
     appData.timetable.changes = [];
   }
 
+  // 今後の時間割変更に備え、全曜日を7限まで保持する。
   timetableDays.forEach(day => {
-    const count = day.number === 4 ? 7 : 6;
     if (!Array.isArray(appData.timetable.weekly[day.number])) {
-      appData.timetable.weekly[day.number] = Array(count).fill("");
+      appData.timetable.weekly[day.number] = Array(7).fill("");
     }
     appData.timetable.weekly[day.number] =
-      appData.timetable.weekly[day.number].slice(0, count);
-    while (appData.timetable.weekly[day.number].length < count) {
+      appData.timetable.weekly[day.number].slice(0, 7);
+    while (appData.timetable.weekly[day.number].length < 7) {
       appData.timetable.weekly[day.number].push("");
     }
   });
@@ -1547,20 +1561,32 @@ function ensureTimetableData() {
 function renderTimetable(content) {
   ensureTimetableData();
 
-  const maxPeriods = 7;
-  const weeklyRows = Array.from({ length: maxPeriods }, (_, periodIndex) => `
+  if (!timetableWeekStart) {
+    timetableWeekStart = getMonday(new Date());
+  }
+
+  const weekDates = timetableDays.map((day, index) => {
+    const date = new Date(timetableWeekStart);
+    date.setDate(date.getDate() + index);
+    return { ...day, date, key: dateString(date) };
+  });
+
+  const weekEnd = weekDates[5].date;
+  const rangeLabel = `${timetableWeekStart.getFullYear()}年${timetableWeekStart.getMonth() + 1}月${timetableWeekStart.getDate()}日 〜 ${weekEnd.getMonth() + 1}月${weekEnd.getDate()}日`;
+
+  const weeklyRows = Array.from({ length: 7 }, (_, periodIndex) => `
     <tr>
       <th class="timetable-period">${periodIndex + 1}限</th>
-      ${timetableDays.map(day => {
-        const subject = appData.timetable.weekly[day.number][periodIndex];
-        const exists = periodIndex < (day.number === 4 ? 7 : 6);
-        return exists ? `
+      ${weekDates.map(day => {
+        const item = getTimetableForDate(day.key)[periodIndex];
+        const subject = item && item.subject ? escapeHTML(item.subject) : "／";
+        return `
           <td>
-            <button class="timetable-cell" onclick="editWeeklySubject(${day.number}, ${periodIndex + 1})">
-              ${escapeHTML(subject || "＋")}
-            </button>
+            <div class="timetable-cell ${item && item.changed ? "is-changed" : ""} ${item && !item.subject ? "is-no-class" : ""}">
+              ${subject}
+            </div>
           </td>
-        ` : `<td class="timetable-empty"></td>`;
+        `;
       }).join("")}
     </tr>
   `).join("");
@@ -1569,32 +1595,57 @@ function renderTimetable(content) {
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period);
 
+  const settingsRows = Array.from({ length: 7 }, (_, periodIndex) => `
+    <tr>
+      <th class="timetable-period">${periodIndex + 1}限</th>
+      ${timetableDays.map(day => `
+        <td>
+          <input class="timetable-setting-input" type="text" maxlength="30"
+            name="weekly-${day.number}-${periodIndex + 1}"
+            value="${escapeHTML(appData.timetable.weekly[day.number][periodIndex] || "")}"
+            aria-label="${day.name}曜日 ${periodIndex + 1}限">
+        </td>
+      `).join("")}
+    </tr>
+  `).join("");
+
   content.innerHTML = `
     <div class="card timetable-card">
-      <div class="calendar-toolbar">
-        <div>
-          <h2 class="card-title">通常時間割</h2>
-          <p class="muted">各マスをタップすると教科を登録・変更できます。</p>
+      <div class="timetable-week-navigation">
+        <button type="button" class="secondary-button timetable-week-button" onclick="shiftTimetableWeek(-1)">‹ <span>前の週</span></button>
+        <div class="timetable-week-heading">
+          <h2 class="card-title">${rangeLabel}</h2>
+          <button type="button" class="timetable-current-week" onclick="goToCurrentTimetableWeek()">今週</button>
         </div>
+        <button type="button" class="secondary-button timetable-week-button" onclick="shiftTimetableWeek(1)"><span>次の週</span> ›</button>
       </div>
 
+      <h3 class="timetable-subtitle timetable-main-subtitle">時間割</h3>
       <div class="timetable-scroll">
         <table class="timetable-table">
           <thead>
             <tr>
-              <th>時限</th>
-              ${timetableDays.map(day => `<th>${day.name}</th>`).join("")}
+              <th class="timetable-period">時限</th>
+              ${weekDates.map(day => `
+                <th>
+                  <span class="timetable-day-name">${day.name}</span>
+                  <span class="timetable-day-date">${formatShortDate(day.date)}</span>
+                </th>
+              `).join("")}
             </tr>
           </thead>
           <tbody>${weeklyRows}</tbody>
         </table>
       </div>
-      <p class="muted timetable-note">木曜日のみ7限まで、ほかの曜日は6限までです。</p>
+      <div class="timetable-legend">
+        <span><i class="timetable-legend-outline"></i> 時間割変更あり</span>
+        <span><b>／</b> 授業なし</span>
+      </div>
     </div>
 
     <div class="card timetable-card">
       <h2 class="card-title">時間割変更</h2>
-      <p class="muted">特定の日の授業だけを変更できます。変更した授業には枠線が付きます。</p>
+      <p class="muted">日付と時限を選び、その日だけの授業を変更できます。変更したコマには上の表で枠線が付きます。</p>
 
       <form class="timetable-change-form" onsubmit="saveTimetableChange(event)">
         <div class="form-field">
@@ -1609,7 +1660,7 @@ function renderTimetable(content) {
         </div>
         <div class="form-field">
           <label for="timetable-change-subject">変更後の教科</label>
-          <input id="timetable-change-subject" type="text" maxlength="30" placeholder="例：英語" required>
+          <input id="timetable-change-subject" type="text" maxlength="30" placeholder="例：英語（授業なしは空欄）">
         </div>
         <button class="primary-button" type="submit">変更を保存</button>
       </form>
@@ -1620,36 +1671,58 @@ function renderTimetable(content) {
           <div class="timetable-change-row">
             <div>
               <strong>${escapeHTML(change.date)}・${change.period}限</strong>
-              <div class="muted">${escapeHTML(change.subject)}</div>
+              <div class="muted">${change.subject ? escapeHTML(change.subject) : "／（授業なし）"}</div>
             </div>
             <div class="timetable-change-actions">
-              <button class="secondary-button" onclick="editTimetableChange(${change.id})">編集</button>
-              <button class="secondary-button" onclick="deleteTimetableChange(${change.id})">削除</button>
+              <button class="secondary-button" type="button" onclick="editTimetableChange(${change.id})">編集</button>
+              <button class="secondary-button" type="button" onclick="deleteTimetableChange(${change.id})">削除</button>
             </div>
           </div>
         `).join("") : `<p class="muted">時間割変更は登録されていません。</p>`}
       </div>
     </div>
 
-    <div class="card timetable-card">
-      <h2 class="card-title">日付ごとの時間割を確認</h2>
-      <div class="form-field">
-        <label for="timetable-preview-date">日付</label>
-        <input id="timetable-preview-date" type="date" value="${todayString()}" onchange="renderTimetablePreview(this.value)">
-      </div>
-      <div id="timetable-preview">${renderTimetablePreviewHTML(todayString())}</div>
-    </div>
+    <details class="card timetable-card timetable-settings-card">
+      <summary>通常時間割を設定</summary>
+      <p class="muted">ここで設定した内容が、上の時間割表の基本になります。上の表自体は編集できません。</p>
+      <form onsubmit="saveWeeklyTimetable(event)">
+        <div class="timetable-scroll">
+          <table class="timetable-table timetable-settings-table">
+            <thead>
+              <tr><th class="timetable-period">時限</th>${timetableDays.map(day => `<th>${day.name}</th>`).join("")}</tr>
+            </thead>
+            <tbody>${settingsRows}</tbody>
+          </table>
+        </div>
+        <button class="primary-button timetable-settings-save" type="submit">通常時間割を保存</button>
+      </form>
+    </details>
   `;
 }
 
-function editWeeklySubject(dayNumber, period) {
-  ensureTimetableData();
-  const current = appData.timetable.weekly[dayNumber][period - 1] || "";
-  const dayName = timetableDays.find(day => day.number === dayNumber).name;
-  const subject = prompt(`${dayName}曜日 ${period}限の教科を入力してください。\\n空欄にすると未登録になります。`, current);
-  if (subject === null) return;
+function shiftTimetableWeek(amount) {
+  if (!timetableWeekStart) timetableWeekStart = getMonday(new Date());
+  timetableWeekStart.setDate(timetableWeekStart.getDate() + amount * 7);
+  renderTimetable(document.getElementById("page-content"));
+}
 
-  appData.timetable.weekly[dayNumber][period - 1] = subject.trim();
+function goToCurrentTimetableWeek() {
+  timetableWeekStart = getMonday(new Date());
+  renderTimetable(document.getElementById("page-content"));
+}
+
+function saveWeeklyTimetable(event) {
+  event.preventDefault();
+  ensureTimetableData();
+  const form = event.currentTarget;
+
+  timetableDays.forEach(day => {
+    for (let period = 1; period <= 7; period++) {
+      const field = form.elements.namedItem(`weekly-${day.number}-${period}`);
+      appData.timetable.weekly[day.number][period - 1] = field ? field.value.trim() : "";
+    }
+  });
+
   saveData();
   renderTimetable(document.getElementById("page-content"));
 }
@@ -1659,13 +1732,11 @@ function updateTimetablePeriodOptions(date) {
   if (!select || !date) return;
 
   const currentValue = Number(select.value || 1);
-  const dayNumber = parseDate(date).getDay();
-  const count = dayNumber === 4 ? 7 : 6;
   select.innerHTML = Array.from(
-    { length: count },
+    { length: 7 },
     (_, index) => `<option value="${index + 1}">${index + 1}限</option>`
   ).join("");
-  select.value = String(Math.min(currentValue, count));
+  select.value = String(Math.min(currentValue, 7));
 }
 
 function saveTimetableChange(event) {
@@ -1676,17 +1747,14 @@ function saveTimetableChange(event) {
   const period = Number(document.getElementById("timetable-change-period").value);
   const subject = document.getElementById("timetable-change-subject").value.trim();
 
-  if (!date || !subject) return;
+  if (!date) return;
 
   const dayNumber = parseDate(date).getDay();
   if (dayNumber === 0) {
     alert("日曜日は時間割の対象外です。");
     return;
   }
-  if (period > (dayNumber === 4 ? 7 : 6)) {
-    alert("その曜日には選択した時限がありません。");
-    return;
-  }
+  if (period < 1 || period > 7) return;
 
   const existing = appData.timetable.changes.find(
     item => item.date === date && Number(item.period) === period
@@ -1711,12 +1779,8 @@ function editTimetableChange(id) {
   const item = appData.timetable.changes.find(change => change.id === id);
   if (!item) return;
 
-  const subject = prompt(`${item.date} ${item.period}限の変更後の教科`, item.subject);
+  const subject = prompt(`${item.date} ${item.period}限の変更後の教科\n空欄にすると授業なしになります。`, item.subject || "");
   if (subject === null) return;
-  if (!subject.trim()) {
-    alert("教科名を入力してください。");
-    return;
-  }
 
   item.subject = subject.trim();
   saveData();
@@ -1736,38 +1800,15 @@ function getTimetableForDate(date) {
   if (dayNumber === 0) return [];
 
   const periods = appData.timetable.weekly[dayNumber] || [];
-  const count = dayNumber === 4 ? 7 : 6;
 
-  return Array.from({ length: count }, (_, index) => {
+  return Array.from({ length: 7 }, (_, index) => {
     const change = appData.timetable.changes.find(
       item => item.date === date && Number(item.period) === index + 1
     );
     return {
       period: index + 1,
-      subject: change ? change.subject : (periods[index] || ""),
+      subject: change ? (change.subject || "") : (periods[index] || ""),
       changed: Boolean(change)
     };
   });
-}
-
-function renderTimetablePreviewHTML(date) {
-  const dayNumber = parseDate(date).getDay();
-  if (dayNumber === 0) return `<p class="muted">日曜日は時間割がありません。</p>`;
-
-  return `
-    <div class="timetable-preview-list">
-      ${getTimetableForDate(date).map(item => `
-        <div class="timetable-preview-row ${item.changed ? "is-changed" : ""}">
-          <span class="timetable-preview-period">${item.period}限</span>
-          <span>${escapeHTML(item.subject || "未登録")}</span>
-          ${item.changed ? `<span class="timetable-changed-label">変更</span>` : ""}
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-function renderTimetablePreview(date) {
-  const target = document.getElementById("timetable-preview");
-  if (target) target.innerHTML = renderTimetablePreviewHTML(date);
 }

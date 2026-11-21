@@ -727,18 +727,22 @@ function renderHome(content) {
   ` : "";
 
   content.innerHTML = `
-    <div class="stat-grid">
-      ${todayEvents.length ? `
-        <div class="stat-card">
-          <div class="stat-label">今日の予定</div>
-          <div class="stat-value">${todayEvents.length}<span class="muted"> 件</span></div>
-        </div>
-      ` : ""}
-      <div class="stat-card">
-        <div class="stat-label">未完了の課題</div>
-        <div class="stat-value">${pendingTasks.length}<span class="muted"> 件</span></div>
+    ${todayEvents.length || pendingTasks.length ? `
+      <div class="stat-grid">
+        ${todayEvents.length ? `
+          <div class="stat-card">
+            <div class="stat-label">今日の予定</div>
+            <div class="stat-value">${todayEvents.length}<span class="muted"> 件</span></div>
+          </div>
+        ` : ""}
+        ${pendingTasks.length ? `
+          <div class="stat-card">
+            <div class="stat-label">未完了の課題</div>
+            <div class="stat-value">${pendingTasks.length}<span class="muted"> 件</span></div>
+          </div>
+        ` : ""}
       </div>
-    </div>
+    ` : ""}
 
     <div class="dashboard-grid">
       ${todayDueCard}

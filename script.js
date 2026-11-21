@@ -21,6 +21,10 @@ let selectedDate = todayString();
 let editingEventId = null;
 let detailEventId = null;
 
+// ドラッグコピー用
+let calendarDrag = null;
+let suppressNextEventClick = false;
+
 // --------------------------------------
 // 初期化
 // --------------------------------------
@@ -33,6 +37,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!button) return;
     showPage(button.dataset.page);
   });
+
+  setupCalendarInteractions();
+  setupZoomPrevention();
+  setupCalendarStyles();
 
   showPage("home");
 });
@@ -125,6 +133,378 @@ function showCalendarScreen(title) {
   });
 
   document.getElementById("page-title").textContent = title;
+}
+
+// --------------------------------------
+// iPad・ブラウザ操作設定
+// --------------------------------------
+
+function setupZoomPrevention() {
+  // viewport設定
+  let viewport = document.querySelector('meta[name="viewport"]');
+
+  if (!viewport) {
+    viewport = document.createElement("meta");
+    viewport.name = "viewport";
+    document.head.appendChild(viewport);
+  }
+
+  viewport.content =
+    "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no";
+
+  // iOS Safariのジェスチャーズームを抑制
+  ["gesturestart", "gesturechange", "gestureend"].forEach(type => {
+    document.addEventListener(type, event => {
+      event.preventDefault();
+    }, { passive: false });
+  });
+
+  // 2本指のピンチ操作を抑制
+  document.addEventListener("touchmove", event => {
+    if (event.touches && event.touches.length > 1) {
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  // ダブルタップによるズームを抑制
+  let lastTouchEnd = 0;
+
+  document.addEventListener("touchend", event => {
+    const now = Date.now();
+
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault();
+    }
+
+    lastTouchEnd = now;
+  }, { passive: false });
+}
+
+// --------------------------------------
+// カレンダー表示スタイル
+// --------------------------------------
+
+function setupCalendarStyles() {
+  if (document.getElementById("study-calendar-custom-styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "study-calendar-custom-styles";
+
+  style.textContent = `
+    /* 長押しによる文字選択を抑制 */
+    .month-calendar,
+    .month-calendar * {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    /* ドラッグ操作 */
+    .month-event-bar {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .month-event-bar.dragging {
+      opacity: 0.45;
+    }
+
+    /* 前後の月の日付 */
+    .month-day.outside-month {
+      background-color: #fafafa;
+    }
+
+    .month-day.outside-month .month-day-number {
+      color: #b8bec8;
+    }
+
+    .month-day.outside-month .month-overflow {
+      opacity: 0.55;
+    }
+
+    /* ドラッグ中の表示 */
+    .study-drag-ghost {
+      position: fixed;
+      z-index: 99999;
+      pointer-events: none;
+      opacity: 0.85;
+      padding: 7px 12px;
+      border-radius: 7px;
+      font-size: 13px;
+      color: #222;
+      background: #e4efff;
+      border: 1px solid #9bbce9;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.15);
+      white-space: nowrap;
+      transform: translate(-50%, -140%);
+    }
+
+    .month-day.drag-copy-target {
+      outline: 2px solid #6b9fe8;
+      outline-offset: -2px;
+      background-color: #edf4ff;
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+// --------------------------------------
+// 予定のドラッグ＆ドロップコピー
+// --------------------------------------
+
+function setupCalendarInteractions() {
+  document.addEventListener("pointerdown", event => {
+    const bar = event.target.closest(".month-event-bar");
+    if (!bar) return;
+
+    const id = Number(bar.dataset.eventId);
+    const item = appData.events.find(event => event.id === id);
+
+    if (!item) return;
+
+    calendarDrag = {
+      id,
+      item,
+      bar,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+      timer: null,
+      ghost: null,
+      target: null
+    };
+
+    if (event.pointerType === "mouse") {
+      startCalendarDrag();
+    } else {
+      // タッチ操作では長押ししてからドラッグ開始
+      calendarDrag.timer = setTimeout(() => {
+        if (calendarDrag) {
+          startCalendarDrag();
+        }
+      }, 350);
+    }
+  });
+
+  document.addEventListener("pointermove", event => {
+    if (!calendarDrag) return;
+    if (event.pointerId !== calendarDrag.pointerId) return;
+
+    if (!calendarDrag.active) {
+      const distance = Math.hypot(
+        event.clientX - calendarDrag.startX,
+        event.clientY - calendarDrag.startY
+      );
+
+      // 長押しが成立する前に動かした場合は通常操作に戻す
+      if (distance > 10 && calendarDrag.timer) {
+        clearTimeout(calendarDrag.timer);
+        calendarDrag.timer = null;
+        calendarDrag = null;
+        return;
+      }
+    }
+
+    if (!calendarDrag || !calendarDrag.active) return;
+
+    event.preventDefault();
+
+    moveCalendarDrag(event.clientX, event.clientY);
+  }, { passive: false });
+
+  document.addEventListener("pointerup", event => {
+    if (!calendarDrag) return;
+    if (event.pointerId !== calendarDrag.pointerId) return;
+
+    if (calendarDrag.timer) {
+      clearTimeout(calendarDrag.timer);
+    }
+
+    if (calendarDrag.active) {
+      const targetDate = findCalendarDateAtPoint(
+        event.clientX,
+        event.clientY
+      );
+
+      if (targetDate) {
+        copyEventToDate(calendarDrag.item, targetDate);
+        suppressNextEventClick = true;
+      }
+
+      finishCalendarDrag();
+    } else {
+      calendarDrag = null;
+    }
+  });
+
+  document.addEventListener("pointercancel", () => {
+    if (calendarDrag) {
+      if (calendarDrag.timer) {
+        clearTimeout(calendarDrag.timer);
+      }
+      finishCalendarDrag();
+    }
+  });
+}
+
+function startCalendarDrag() {
+  if (!calendarDrag || calendarDrag.active) return;
+
+  calendarDrag.active = true;
+
+  calendarDrag.bar.classList.add("dragging");
+
+  const ghost = document.createElement("div");
+  ghost.className = "study-drag-ghost";
+  ghost.textContent = calendarDrag.item.title;
+
+  document.body.appendChild(ghost);
+
+  calendarDrag.ghost = ghost;
+
+  moveCalendarDrag(
+    calendarDrag.startX,
+    calendarDrag.startY
+  );
+}
+
+function moveCalendarDrag(x, y) {
+  if (!calendarDrag || !calendarDrag.active) return;
+
+  if (calendarDrag.ghost) {
+    calendarDrag.ghost.style.left = `${x}px`;
+    calendarDrag.ghost.style.top = `${y}px`;
+  }
+
+  document.querySelectorAll(".month-day.drag-copy-target").forEach(cell => {
+    cell.classList.remove("drag-copy-target");
+  });
+
+  const targetDate = findCalendarDateAtPoint(x, y);
+
+  if (targetDate) {
+    const targetCell = Array.from(
+      document.querySelectorAll(".month-day")
+    ).find(cell => cell.dataset.date === targetDate);
+
+    if (targetCell) {
+      targetCell.classList.add("drag-copy-target");
+      calendarDrag.target = targetDate;
+    }
+  } else {
+    calendarDrag.target = null;
+  }
+}
+
+function findCalendarDateAtPoint(x, y) {
+  const cells = document.querySelectorAll(".month-day");
+
+  for (const cell of cells) {
+    const rect = cell.getBoundingClientRect();
+
+    if (
+      x >= rect.left &&
+      x <= rect.right &&
+      y >= rect.top &&
+      y <= rect.bottom
+    ) {
+      return cell.dataset.date || null;
+    }
+  }
+
+  return null;
+}
+
+function finishCalendarDrag() {
+  if (!calendarDrag) return;
+
+  if (calendarDrag.timer) {
+    clearTimeout(calendarDrag.timer);
+  }
+
+  if (calendarDrag.bar) {
+    calendarDrag.bar.classList.remove("dragging");
+  }
+
+  if (calendarDrag.ghost) {
+    calendarDrag.ghost.remove();
+  }
+
+  document.querySelectorAll(".month-day.drag-copy-target").forEach(cell => {
+    cell.classList.remove("drag-copy-target");
+  });
+
+  calendarDrag = null;
+}
+
+function copyEventToDate(item, targetDate) {
+  if (!item || !targetDate) return;
+
+  const originalStart = getEventStart(item);
+  const originalEnd = getEventEnd(item);
+
+  const originalStartDate = parseDate(originalStart);
+  const originalEndDate = parseDate(originalEnd);
+
+  const duration = Math.round(
+    (originalEndDate - originalStartDate) / 86400000
+  );
+
+  const newStartDate = targetDate;
+
+  const newEnd = new Date(parseDate(targetDate));
+  newEnd.setDate(newEnd.getDate() + duration);
+
+  const newEndDate = dateString(newEnd);
+
+  const newId = createUniqueEventId();
+
+  const copiedEvent = {
+    ...item,
+    id: newId,
+    date: newStartDate,
+    startDate: newStartDate,
+    endDate: newEndDate
+  };
+
+  appData.events.push(copiedEvent);
+
+  saveData();
+
+  selectedDate = newStartDate;
+  calendarDate = parseDate(newStartDate);
+
+  if (currentPage === "calendar") {
+    renderCalendar(document.getElementById("page-content"));
+  }
+
+  alert(`「${item.title}」を${formatDate(parseDate(targetDate))}にコピーしました。`);
+}
+
+function createUniqueEventId() {
+  let id = Date.now();
+
+  while (appData.events.some(item => item.id === id)) {
+    id++;
+  }
+
+  return id;
+}
+
+function handleMonthEventClick(event, id, date) {
+  event.stopPropagation();
+
+  if (suppressNextEventClick) {
+    suppressNextEventClick = false;
+    return;
+  }
+
+  openCalendarDay(date);
 }
 
 // --------------------------------------
@@ -336,9 +716,31 @@ function renderMonthView(year, month) {
         getEventEnd(item) >= weekDates[0]
       )
       .sort((a, b) => {
-        const startCompare = getEventStart(a).localeCompare(getEventStart(b));
-        if (startCompare !== 0) return startCompare;
-        return getEventEnd(a).localeCompare(getEventEnd(b));
+        const aStart = getEventStart(a);
+        const aEnd = getEventEnd(a);
+        const bStart = getEventStart(b);
+        const bEnd = getEventEnd(b);
+
+        const aMulti = aStart !== aEnd;
+        const bMulti = bStart !== bEnd;
+
+        // 複数日予定を優先
+        if (aMulti !== bMulti) {
+          return aMulti ? -1 : 1;
+        }
+
+        // 複数日予定同士は期間が長い順
+        const aDuration =
+          parseDate(aEnd) - parseDate(aStart);
+
+        const bDuration =
+          parseDate(bEnd) - parseDate(bStart);
+
+        if (aDuration !== bDuration) {
+          return bDuration - aDuration;
+        }
+
+        return aStart.localeCompare(bStart);
       });
 
     // 予定を最大3段に配置
@@ -391,6 +793,7 @@ function renderMonthView(year, month) {
 
       return `
         <div class="month-day ${day.key === today ? "today" : ""} ${day.outside ? "outside-month" : ""}"
+          data-date="${day.key}"
           onclick="openCalendarDay('${day.key}')"
           role="button"
           tabindex="0"
@@ -416,8 +819,9 @@ function renderMonthView(year, month) {
           class="month-event-bar ${getCategoryStyle(item.category)}
             ${continuesBefore ? "continues-before" : ""}
             ${continuesAfter ? "continues-after" : ""}"
+          data-event-id="${item.id}"
           style="grid-column: ${startIndex + 1} / span ${span}; grid-row: ${laneIndex + 1};"
-          onclick="event.stopPropagation();openCalendarDay('${weekDates[startIndex]}')"
+          onclick="handleMonthEventClick(event, ${item.id}, '${weekDates[startIndex]}')"
           title="${escapeHTML(item.title)}">
           ${escapeHTML(item.title)}
         </button>
@@ -825,7 +1229,7 @@ function saveEventForm(event) {
 
   if (editingEventId === null) {
     appData.events.push({
-      id: Date.now(),
+      id: createUniqueEventId(),
       ...eventData
     });
   } else {

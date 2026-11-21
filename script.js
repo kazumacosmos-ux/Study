@@ -17,14 +17,16 @@ const pageNames = {
 let currentPage = "home";
 let calendarDate = new Date();
 let calendarView = "month";
+let selectedDate = todayString();
+let editingEventId = null;
+let detailEventId = null;
 
 // --------------------------------------
 // 初期化
 // --------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("today-label").textContent =
-    formatDate(new Date());
+  document.getElementById("today-label").textContent = formatDate(new Date());
 
   document.getElementById("navigation").addEventListener("click", event => {
     const button = event.target.closest(".nav-item");
@@ -53,6 +55,11 @@ function dateString(date) {
 
 function todayString() {
   return dateString(new Date());
+}
+
+function parseDate(value) {
+  const parts = value.split("-").map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
 function escapeHTML(value) {
@@ -100,13 +107,20 @@ function showPage(page) {
   }
 }
 
+function showCalendarScreen(title) {
+  document.querySelectorAll(".nav-item").forEach(button => {
+    button.classList.toggle("active", button.dataset.page === "calendar");
+  });
+
+  document.getElementById("page-title").textContent = title;
+}
+
 // --------------------------------------
 // ホーム
 // --------------------------------------
 
 function renderHome(content) {
   const today = todayString();
-
   const todayEvents = appData.events.filter(item => item.date === today);
   const pendingTasks = appData.tasks.filter(item => item.status !== "completed");
 
@@ -140,13 +154,10 @@ function renderHome(content) {
         <h2 class="card-title">今日の予定</h2>
         <div class="item-list">
           ${todayEvents.length ? todayEvents.map(item => `
-            <div class="list-item">
-              <div>
-                <strong>${escapeHTML(item.title)}</strong>
-                <div class="muted">${escapeHTML(item.time || "時間未設定")}</div>
-              </div>
+            <button class="list-item event-list-button" onclick="openEventDetail(${item.id})">
+              <strong>${escapeHTML(item.title)}</strong>
               <span class="tag">${escapeHTML(item.category || "その他")}</span>
-            </div>
+            </button>
           `).join("") : `<p class="muted">今日の予定はありません。</p>`}
         </div>
       </div>
@@ -187,7 +198,6 @@ function getCategoryStyle(category) {
     "休校・休み": "event-red",
     "その他": "event-orange"
   };
-
   return styles[category] || "event-blue";
 }
 
@@ -202,10 +212,8 @@ function renderCalendar(content) {
   } else if (calendarView === "week") {
     const start = new Date(calendarDate);
     start.setDate(start.getDate() - start.getDay());
-
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
-
     heading = `${start.getMonth() + 1}/${start.getDate()} ～ ${end.getMonth() + 1}/${end.getDate()}`;
   } else {
     heading = `${year}年${month + 1}月`;
@@ -229,9 +237,7 @@ function renderCalendar(content) {
           <button class="secondary-button" onclick="goToday()">今日</button>
           <button class="secondary-button" onclick="changeCalendar(1)">→</button>
         </div>
-
         <strong class="calendar-heading">${heading}</strong>
-
         <div class="calendar-views">
           <button class="secondary-button ${calendarView === "month" ? "view-active" : ""}" onclick="setCalendarView('month')">月</button>
           <button class="secondary-button ${calendarView === "week" ? "view-active" : ""}" onclick="setCalendarView('week')">週</button>
@@ -250,7 +256,7 @@ function renderCalendar(content) {
       </div>
 
       <div class="calendar-add-area">
-        <button class="primary-button" onclick="addEvent()">＋ 予定を追加</button>
+        <button class="primary-button" onclick="openEventForm()">＋ 予定を追加</button>
       </div>
     </div>
   `;
@@ -268,12 +274,9 @@ function renderMonthView(year, month) {
     const day = i - firstDay + 1;
     const date = new Date(year, month, day);
     const dateKey = dateString(date);
-
     const outside = date.getMonth() !== month;
-    const events = appData.events
-      .map((item, index) => ({ ...item, index }))
-      .filter(item => item.date === dateKey);
 
+    const events = appData.events.filter(item => item.date === dateKey);
     const tasks = appData.tasks.filter(item => item.dueDate === dateKey);
 
     cells += `
@@ -284,7 +287,7 @@ function renderMonthView(year, month) {
 
         ${events.map(item => `
           <button class="calendar-event ${getCategoryStyle(item.category)}"
-            onclick="editEvent(${item.index})">
+            onclick="openEventDetail(${item.id})">
             ${escapeHTML(item.title)}
           </button>
         `).join("")}
@@ -324,20 +327,12 @@ function renderWeekView() {
 }
 
 function renderDayView() {
-  return `
-    <div class="day-calendar">
-      ${renderDayColumn(calendarDate)}
-    </div>
-  `;
+  return `<div class="day-calendar">${renderDayColumn(calendarDate)}</div>`;
 }
 
 function renderDayColumn(date) {
   const dateKey = dateString(date);
-
-  const events = appData.events
-    .map((item, index) => ({ ...item, index }))
-    .filter(item => item.date === dateKey);
-
+  const events = appData.events.filter(item => item.date === dateKey);
   const tasks = appData.tasks.filter(item => item.dueDate === dateKey);
 
   return `
@@ -349,21 +344,16 @@ function renderDayColumn(date) {
 
       ${events.length ? events.map(item => `
         <button class="calendar-event ${getCategoryStyle(item.category)}"
-          onclick="editEvent(${item.index})">
-          ${escapeHTML(item.time || "")}
+          onclick="openEventDetail(${item.id})">
           ${escapeHTML(item.title)}
         </button>
       `).join("") : `<p class="muted">予定はありません。</p>`}
 
       ${tasks.map(item => `
-        <div class="calendar-event event-task">
-          課題：${escapeHTML(item.title)}
-        </div>
+        <div class="calendar-event event-task">課題：${escapeHTML(item.title)}</div>
       `).join("")}
 
-      <button class="secondary-button" onclick="addEvent('${dateKey}')">
-        ＋ 予定を追加
-      </button>
+      <button class="secondary-button" onclick="openCalendarDay('${dateKey}')">この日の予定を見る</button>
     </div>
   `;
 }
@@ -391,25 +381,81 @@ function goToday() {
   renderCalendar(document.getElementById("page-content"));
 }
 
+// --------------------------------------
+// 日付専用画面
+// --------------------------------------
+
 function openCalendarDay(date) {
-  const parts = date.split("-").map(Number);
-  calendarDate = new Date(parts[0], parts[1] - 1, parts[2]);
-  calendarView = "day";
-  renderCalendar(document.getElementById("page-content"));
+  selectedDate = date;
+  renderCalendarDay();
+}
+
+function renderCalendarDay() {
+  showCalendarScreen("予定一覧");
+
+  const content = document.getElementById("page-content");
+  const date = parseDate(selectedDate);
+  const events = appData.events.filter(item => item.date === selectedDate);
+  const tasks = appData.tasks.filter(item => item.dueDate === selectedDate);
+
+  content.innerHTML = `
+    <div class="card calendar-detail-page">
+      <div class="calendar-detail-header">
+        <button class="secondary-button" onclick="showPage('calendar')">← カレンダーに戻る</button>
+        <button class="primary-button" onclick="openEventForm()">＋ 予定を追加</button>
+      </div>
+
+      <div class="calendar-detail-date">
+        <div class="eyebrow">DAILY SCHEDULE</div>
+        <h2>${formatDate(date)}</h2>
+        <p class="muted">${["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"][date.getDay()]}</p>
+      </div>
+
+      <h3 class="card-title">予定 ${events.length}件</h3>
+      <div class="item-list">
+        ${events.length ? events.map(item => `
+          <button class="event-detail-row" onclick="openEventDetail(${item.id})">
+            <span class="event-color-mark ${getCategoryStyle(item.category)}"></span>
+            <span class="event-detail-title">${escapeHTML(item.title)}</span>
+            <span class="muted">›</span>
+          </button>
+        `).join("") : `<p class="muted">この日の予定はありません。</p>`}
+      </div>
+
+      ${tasks.length ? `
+        <div class="calendar-day-tasks">
+          <h3 class="card-title">期限がこの日の課題</h3>
+          ${tasks.map(item => `
+            <div class="list-item">
+              <strong>${escapeHTML(item.title)}</strong>
+              <span class="tag">${escapeHTML(item.subject || "未分類")}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+    </div>
+  `;
 }
 
 // --------------------------------------
-// 予定の追加・編集・削除
+// 予定の追加・編集画面
 // --------------------------------------
 
-function addEvent(defaultDate = todayString()) {
-  const title = prompt("予定の名前を入力してください");
-  if (!title) return;
+function openEventForm(id = null) {
+  editingEventId = id;
+  renderEventForm();
+}
 
-  const date = prompt("日付を入力してください（例：2026-11-20）", defaultDate);
+function renderEventForm() {
+  showCalendarScreen(editingEventId === null ? "予定を追加" : "予定を編集");
 
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    alert("日付の形式が正しくありません。");
+  const content = document.getElementById("page-content");
+  const item = editingEventId === null
+    ? null
+    : appData.events.find(event => event.id === editingEventId);
+
+  if (editingEventId !== null && !item) {
+    renderCalendarDay();
     return;
   }
 
@@ -421,98 +467,173 @@ function addEvent(defaultDate = todayString()) {
     "その他"
   ];
 
-  const categoryText = categories.map((item, index) => `${index + 1}. ${item}`).join("\n");
+  content.innerHTML = `
+    <div class="card event-form-card">
+      <div class="event-form-header">
+        <button class="secondary-button" onclick="cancelEventForm()">← 戻る</button>
+        <h2 class="card-title">${item ? "予定を編集" : "新しい予定"}</h2>
+      </div>
 
-  const choice = prompt(`予定の種類を選んでください。\n${categoryText}`, "1");
-  if (choice === null) return;
+      <form id="event-form" class="event-form">
+        <div class="form-field">
+          <label for="event-title">予定名</label>
+          <input id="event-title" name="title" type="text"
+            placeholder="例：数学の小テスト" maxlength="100"
+            value="${escapeHTML(item?.title || "")}" required>
+        </div>
 
-  const category = categories[Number(choice) - 1];
+        <div class="form-field">
+          <label for="event-date">日付</label>
+          <input id="event-date" name="date" type="date"
+            value="${escapeHTML(item?.date || selectedDate || todayString())}" required>
+        </div>
 
-  if (!category) {
-    alert("正しい番号を選んでください。");
+        <div class="form-field">
+          <label>カテゴリー</label>
+          <div class="event-category-options">
+            ${categories.map((category, index) => `
+              <label class="event-category-option">
+                <input type="radio" name="category" value="${category}"
+                  ${item ? (item.category === category ? "checked" : "") : (index === 0 ? "checked" : "")}>
+                <span class="event-category-chip ${getCategoryStyle(category)}">${category}</span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="event-memo">メモ <span class="muted">（任意）</span></label>
+          <textarea id="event-memo" name="memo" rows="4"
+            placeholder="予定についてのメモ">${escapeHTML(item?.memo || "")}</textarea>
+        </div>
+
+        <div class="event-form-actions">
+          <button type="button" class="secondary-button" onclick="cancelEventForm()">キャンセル</button>
+          <button type="submit" class="primary-button">${item ? "変更を保存" : "予定を保存"}</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.getElementById("event-form").addEventListener("submit", saveEventForm);
+  document.getElementById("event-title").focus();
+}
+
+function saveEventForm(event) {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const title = form.elements.title.value.trim();
+  const date = form.elements.date.value;
+  const category = form.elements.category.value;
+  const memo = form.elements.memo.value.trim();
+
+  if (!title || !date || !category) {
+    alert("予定名・日付・カテゴリーを入力してください。");
     return;
   }
 
-  const time = prompt("時間を入力してください（任意）", "");
+  const parsed = parseDate(date);
+  if (dateString(parsed) !== date) {
+    alert("正しい日付を入力してください。");
+    return;
+  }
 
-  appData.events.push({
-    id: Date.now(),
-    title,
-    date,
-    category,
-    time: time || ""
-  });
+  if (editingEventId === null) {
+    appData.events.push({
+      id: Date.now(),
+      title,
+      date,
+      category,
+      memo
+    });
+  } else {
+    const index = appData.events.findIndex(item => item.id === editingEventId);
+    if (index === -1) return;
+
+    appData.events[index] = {
+      ...appData.events[index],
+      title,
+      date,
+      category,
+      memo
+    };
+  }
+
+  selectedDate = date;
+  calendarDate = parseDate(date);
 
   saveData();
-  renderCalendar(document.getElementById("page-content"));
+  renderCalendarDay();
 }
 
-function editEvent(index) {
-  const item = appData.events[index];
+function cancelEventForm() {
+  if (editingEventId !== null) {
+    openEventDetail(editingEventId);
+  } else {
+    renderCalendarDay();
+  }
+}
+
+// --------------------------------------
+// 予定の詳細画面
+// --------------------------------------
+
+function openEventDetail(id) {
+  detailEventId = id;
+  renderEventDetail();
+}
+
+function renderEventDetail() {
+  const item = appData.events.find(event => event.id === detailEventId);
+
+  if (!item) {
+    renderCalendarDay();
+    return;
+  }
+
+  selectedDate = item.date;
+  showCalendarScreen("予定の詳細");
+
+  const content = document.getElementById("page-content");
+
+  content.innerHTML = `
+    <div class="card event-detail-page">
+      <button class="secondary-button" onclick="renderCalendarDay()">← 予定一覧に戻る</button>
+
+      <div class="event-detail-main">
+        <span class="event-color-mark large ${getCategoryStyle(item.category)}"></span>
+        <div>
+          <div class="muted">${escapeHTML(item.category || "その他")}</div>
+          <h2>${escapeHTML(item.title)}</h2>
+          <p class="muted">${formatDate(parseDate(item.date))}</p>
+        </div>
+      </div>
+
+      ${item.memo ? `
+        <div class="event-memo">
+          <h3>メモ</h3>
+          <p>${escapeHTML(item.memo).replace(/\n/g, "<br>")}</p>
+        </div>
+      ` : ""}
+
+      <div class="event-detail-actions">
+        <button class="primary-button" onclick="openEventForm(${item.id})">編集する</button>
+        <button class="secondary-button danger-button" onclick="deleteEvent(${item.id})">削除する</button>
+      </div>
+    </div>
+  `;
+}
+
+function deleteEvent(id) {
+  const item = appData.events.find(event => event.id === id);
   if (!item) return;
 
-  const action = prompt(
-    "操作を選んでください。\n1. 編集\n2. 削除",
-    "1"
-  );
+  if (!confirm(`「${item.title}」を削除しますか？`)) return;
 
-  if (action === "2") {
-    if (confirm("この予定を削除しますか？")) {
-      appData.events.splice(index, 1);
-      saveData();
-      renderCalendar(document.getElementById("page-content"));
-    }
-    return;
-  }
-
-  if (action !== "1") return;
-
-  const title = prompt("予定名", item.title);
-  if (title === null || !title.trim()) return;
-
-  const date = prompt("日付（YYYY-MM-DD）", item.date);
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    alert("日付の形式が正しくありません。");
-    return;
-  }
-
-  const categories = [
-    "授業・通常予定",
-    "小テスト・定期テスト",
-    "行事・イベント",
-    "休校・休み",
-    "その他"
-  ];
-
-  const currentCategory = categories.indexOf(item.category);
-  const categoryText = categories.map((value, i) => `${i + 1}. ${value}`).join("\n");
-
-  const choice = prompt(
-    `予定の種類\n${categoryText}`,
-    String(currentCategory >= 0 ? currentCategory + 1 : 1)
-  );
-
-  if (choice === null) return;
-
-  const category = categories[Number(choice) - 1];
-  if (!category) {
-    alert("正しい番号を選んでください。");
-    return;
-  }
-
-  const time = prompt("時間", item.time || "");
-  if (time === null) return;
-
-  appData.events[index] = {
-    ...item,
-    title: title.trim(),
-    date,
-    category,
-    time
-  };
-
+  appData.events = appData.events.filter(event => event.id !== id);
   saveData();
-  renderCalendar(document.getElementById("page-content"));
+  renderCalendarDay();
 }
 
 // --------------------------------------
@@ -526,7 +647,6 @@ function renderTasks(content) {
         <h2 class="card-title">課題一覧</h2>
         <button class="primary-button" onclick="addTask()">＋ 課題を追加</button>
       </div>
-
       <div class="item-list">
         ${appData.tasks.length ? appData.tasks.map((item, index) => `
           <div class="list-item">
@@ -598,7 +718,6 @@ function renderMaterials(content) {
         <h2 class="card-title">教材一覧</h2>
         <button class="primary-button" onclick="addMaterial()">＋ 教材を追加</button>
       </div>
-
       <div class="item-list">
         ${appData.materials.length ? appData.materials.map((item, index) => `
           <div class="list-item">
@@ -665,7 +784,6 @@ function renderRecords(content) {
         <h2 class="card-title">学習記録</h2>
         <button class="primary-button" onclick="addRecord()">＋ 記録する</button>
       </div>
-
       <div class="item-list">
         ${appData.records.length ? appData.records.slice().reverse().map(item => `
           <div class="list-item">
@@ -686,7 +804,6 @@ function addRecord() {
   if (subject === null) return;
 
   const minutes = Number(prompt("学習時間を分単位で入力してください"));
-
   if (!Number.isFinite(minutes) || minutes <= 0) {
     alert("正しい学習時間を入力してください。");
     return;
@@ -717,7 +834,6 @@ function renderGrades(content) {
         <h2 class="card-title">成績一覧</h2>
         <button class="primary-button" onclick="addGrade()">＋ 成績を追加</button>
       </div>
-
       <div class="item-list">
         ${appData.grades.length ? appData.grades.map(item => `
           <div class="list-item">
@@ -741,7 +857,6 @@ function addGrade() {
   if (!testName) return;
 
   const score = Number(prompt("点数を入力してください"));
-
   if (!Number.isFinite(score) || score < 0) {
     alert("正しい点数を入力してください。");
     return;

@@ -68,6 +68,11 @@ button {
 }
 
 .nav-item {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  cursor: pointer;
   border: none;
   background: transparent;
   color: #aeb8d0;

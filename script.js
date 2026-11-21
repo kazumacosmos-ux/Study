@@ -41,10 +41,13 @@ let timetableWeekStart = null;
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("today-label").textContent = formatDate(new Date());
 
-  document.getElementById("navigation").addEventListener("click", event => {
-    const button = event.target.closest(".nav-item");
-    if (!button) return;
-    showPage(button.dataset.page);
+  // サイドバーの各ボタンに直接クリック処理を登録する
+  document.querySelectorAll("#navigation .nav-item").forEach(button => {
+    button.type = "button";
+    button.addEventListener("click", () => {
+      const page = button.dataset.page;
+      if (page) showPage(page);
+    });
   });
 
   setupCalendarInteractions();
@@ -635,6 +638,9 @@ function renderHome(content) {
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 1);
 
+  // 提出期限が今日の課題は、完了・未完了に関係なくすべて表示する
+  const todayDueTasks = appData.tasks.filter(item => item.dueDate === today);
+
   const todayTimetable = getTimetableForDate(today)
     .filter(item => item.subject && item.subject.trim());
 
@@ -675,6 +681,21 @@ function renderHome(content) {
               <span class="tag">${escapeHTML(item.subject || "未分類")}</span>
             </div>
           `).join("") : `<p class="muted">未完了の課題はありません。</p>`}
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">本日提出の課題</h2>
+        <div class="item-list">
+          ${todayDueTasks.length ? todayDueTasks.map(item => `
+            <div class="list-item">
+              <div>
+                <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
+                <div class="muted">${escapeHTML(item.subject || "未分類")}</div>
+              </div>
+              <span class="tag">${item.status === "completed" ? "完了" : "未完了"}</span>
+            </div>
+          `).join("") : `<p class="muted">本日提出の課題はありません。</p>`}
         </div>
       </div>
 

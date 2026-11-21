@@ -1,3 +1,4 @@
+
 * {
   box-sizing: border-box;
 }
@@ -737,11 +738,11 @@ textarea:focus {
   gap: 16px;
 }
 
+/* 終日チェック */
 .event-time-fields[hidden] {
   display: none !important;
 }
 
-/* 終日チェック */
 .all-day-label {
   display: flex;
   align-items: center;
@@ -800,6 +801,7 @@ textarea:focus {
   overflow-x: auto;
 }
 
+/* 曜日 */
 .month-weekdays,
 .month-day-grid,
 .month-event-grid,
@@ -810,6 +812,14 @@ textarea:focus {
 
 .month-weekdays {
   border-bottom: 1px solid #e4e8f0;
+  border-left: 1px solid #e1e6ef;
+  border-right: 1px solid #e1e6ef;
+  background-image: linear-gradient(
+    to right,
+    transparent calc(100% - 1px),
+    #e1e6ef calc(100% - 1px)
+  );
+  background-size: calc(100% / 7) 100%;
 }
 
 .month-weekdays .calendar-weekday {
@@ -817,20 +827,29 @@ textarea:focus {
   padding: 8px 4px;
 }
 
+/* 週全体 */
 .month-week {
   border-bottom: 1px solid #e1e6ef;
+  border-left: 1px solid #e1e6ef;
+  border-right: 1px solid #e1e6ef;
+}
+
+/* 日付欄 */
+.month-day-grid {
+  background-image: linear-gradient(
+    to right,
+    transparent calc(100% - 1px),
+    #e1e6ef calc(100% - 1px)
+  );
+  background-size: calc(100% / 7) 100%;
 }
 
 .month-day {
   min-width: 0;
   min-height: 43px;
   padding: 8px 6px 4px;
-  border-right: 1px solid #e1e6ef;
+  border: none;
   cursor: pointer;
-}
-
-.month-day:first-child {
-  border-left: 1px solid #e1e6ef;
 }
 
 .month-day:hover {
@@ -842,7 +861,7 @@ textarea:focus {
 }
 
 .month-day.outside-month {
-  color: #aab0bd;
+  background-color: #fafafa;
 }
 
 .month-day-heading {
@@ -870,6 +889,11 @@ textarea:focus {
   color: #fff;
 }
 
+.month-day.outside-month .month-day-number {
+  background: #f1f2f4;
+  color: #b8bec8;
+}
+
 .month-overflow {
   display: inline-block;
   padding: 4px 6px;
@@ -881,14 +905,18 @@ textarea:focus {
   white-space: nowrap;
 }
 
-/* 予定の帯を縦に並べる */
+/* 予定の帯 */
 .month-event-grid {
   grid-template-rows: repeat(3, minmax(25px, auto));
   grid-auto-flow: row;
   row-gap: 3px;
   padding: 2px 0 6px;
-  border-left: 1px solid #e1e6ef;
-  border-right: 1px solid #e1e6ef;
+  background-image: linear-gradient(
+    to right,
+    transparent calc(100% - 1px),
+    #e1e6ef calc(100% - 1px)
+  );
+  background-size: calc(100% / 7) 100%;
 }
 
 .month-event-bar {
@@ -904,7 +932,7 @@ textarea:focus {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  cursor: pointer;
+  cursor: grab;
 }
 
 .month-event-bar.event-blue {
@@ -938,16 +966,20 @@ textarea:focus {
   border-bottom-right-radius: 0;
 }
 
-/* 課題 */
+/* 課題欄 */
 .month-task-grid {
-  border-left: 1px solid #e1e6ef;
-  border-right: 1px solid #e1e6ef;
+  background-image: linear-gradient(
+    to right,
+    transparent calc(100% - 1px),
+    #e1e6ef calc(100% - 1px)
+  );
+  background-size: calc(100% / 7) 100%;
 }
 
 .month-task-cell {
   min-width: 0;
   padding: 2px 4px 7px;
-  border-right: 1px solid #e1e6ef;
+  border: none;
 }
 
 .month-task-label {
@@ -960,6 +992,7 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
+/* 小さい画面 */
 @media (max-width: 600px) {
   .month-day {
     padding: 6px 3px 3px;

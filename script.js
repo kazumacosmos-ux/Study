@@ -627,8 +627,12 @@ function renderHome(content) {
 
   const upcomingTasks = pendingTasks
     .filter(item => item.dueDate)
+    .slice()
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-    .slice(0, 5);
+    .slice(0, 1);
+
+  const todayTimetable = getTimetableForDate(today)
+    .filter(item => item.subject && item.subject.trim());
 
   content.innerHTML = `
     <div class="stat-grid">
@@ -666,14 +670,21 @@ function renderHome(content) {
               </div>
               <span class="tag">${escapeHTML(item.subject || "未分類")}</span>
             </div>
-          `).join("") : `<p class="muted">課題はありません。</p>`}
+          `).join("") : `<p class="muted">未完了の課題はありません。</p>`}
         </div>
       </div>
 
       <div class="card wide">
-        <h2 class="card-title">Studyへようこそ</h2>
-        <p class="muted">予定と課題をまとめて管理しよう。</p>
-        <button class="primary-button" onclick="showPage('calendar')">カレンダーを開く</button>
+        <h2 class="card-title">本日の時間割</h2>
+        <div class="today-timetable-list">
+          ${todayTimetable.length ? todayTimetable.map(item => `
+            <div class="list-item today-timetable-item">
+              <strong>${item.period}限</strong>
+              <span>${escapeHTML(item.subject)}</span>
+              ${item.changed ? `<span class="tag">変更</span>` : ""}
+            </div>
+          `).join("") : `<p class="muted">本日の授業はありません。</p>`}
+        </div>
       </div>
     </div>
   `;
@@ -1527,36 +1538,53 @@ function deleteEvent(id) {
 // --------------------------------------
 
 function renderTasks(content) {
+  const pendingTasks = appData.tasks
+    .map((item, index) => ({ item, index }))
+    .filter(entry => entry.item.status !== "completed")
+    .sort((a, b) => {
+      const dateCompare = (a.item.dueDate || "").localeCompare(b.item.dueDate || "");
+      return dateCompare || a.index - b.index;
+    });
+
+  const completedTasks = appData.tasks
+    .map((item, index) => ({ item, index }))
+    .filter(entry => entry.item.status === "completed");
+
+  const renderTaskItems = entries => entries.length ? entries.map(({ item, index }) => `
+    <div class="list-item">
+      <div>
+        <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
+        <div class="muted">
+          ${escapeHTML(item.subject || "未分類")} ・ 期限：${escapeHTML(item.dueDate || "未設定")}
+        </div>
+        ${item.range ? `<div class="task-range-preview">${escapeHTML(item.range).replace(/\n/g, "<br>")}</div>` : ""}
+        ${item.memo ? `<div class="muted task-memo-preview">${escapeHTML(item.memo).replace(/\n/g, "<br>")}</div>` : ""}
+      </div>
+      <div class="task-actions">
+        <select onchange="changeTaskStatus(${index}, this.value)">
+          <option value="notStarted" ${item.status === "notStarted" ? "selected" : ""}>未着手</option>
+          <option value="inProgress" ${item.status === "inProgress" ? "selected" : ""}>進行中</option>
+          <option value="completed" ${item.status === "completed" ? "selected" : ""}>完了</option>
+        </select>
+        <button class="secondary-button" onclick="deleteTask(${index})">削除</button>
+      </div>
+    </div>
+  `).join("") : `<p class="muted">課題はありません。</p>`;
+
   content.innerHTML = `
     <div class="card">
       <div class="calendar-toolbar">
         <h2 class="card-title">課題一覧</h2>
         <button class="primary-button" onclick="addTask()">＋ 課題を追加</button>
       </div>
-
-      <div class="item-list">
-        ${appData.tasks.length ? appData.tasks.map((item, index) => `
-          <div class="list-item">
-            <div>
-              <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
-              <div class="muted">
-                ${escapeHTML(item.subject || "未分類")} ・ 期限：${escapeHTML(item.dueDate || "未設定")}
-              </div>
-              ${item.range ? `<div class="task-range-preview">${escapeHTML(item.range).replace(/\\n/g, "<br>")}</div>` : ""}
-              ${item.memo ? `<div class="muted task-memo-preview">${escapeHTML(item.memo).replace(/\\n/g, "<br>")}</div>` : ""}
-            </div>
-
-            <div class="task-actions">
-              <select onchange="changeTaskStatus(${index}, this.value)">
-                <option value="notStarted" ${item.status === "notStarted" ? "selected" : ""}>未着手</option>
-                <option value="inProgress" ${item.status === "inProgress" ? "selected" : ""}>進行中</option>
-                <option value="completed" ${item.status === "completed" ? "selected" : ""}>完了</option>
-              </select>
-              <button class="secondary-button" onclick="deleteTask(${index})">削除</button>
-            </div>
-          </div>
-        `).join("") : `<p class="muted">まだ課題は登録されていません。</p>`}
-      </div>
+      <section class="task-list-section">
+        <h3 class="task-section-title">未完了の課題</h3>
+        <div class="item-list">${renderTaskItems(pendingTasks)}</div>
+      </section>
+      <section class="task-list-section completed-task-section">
+        <h3 class="task-section-title">完了した課題</h3>
+        <div class="item-list">${renderTaskItems(completedTasks)}</div>
+      </section>
     </div>
   `;
 }

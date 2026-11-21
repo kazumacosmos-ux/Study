@@ -1845,3 +1845,34 @@ textarea:focus {
   font-size: 14px;
   font-weight: 700;
 }
+
+
+/* 休みの日の背景は週全体の列背景で描画し、各段の隙間でも途切れないようにする */
+.month-week {
+  background-color: #fff;
+}
+.month-day,
+.month-day.today,
+.month-day.outside-month,
+.month-day.day-off,
+.month-day.day-off:hover,
+.month-day.day-off.today,
+.month-event-hit-target,
+.month-event-hit-target.day-off,
+.month-event-hit-target.outside-month,
+.month-event-hit-target.day-off.outside-month,
+.month-task-cell,
+.month-task-cell.day-off,
+.month-task-cell.outside-month,
+.month-task-cell.day-off.outside-month {
+  background-color: transparent !important;
+}
+
+/* 本日の時間割：変更表示は時限名の隣、授業名は常に右端 */
+.today-timetable-item .today-timetable-changed {
+  margin-left: 0;
+}
+.today-timetable-item .today-timetable-subject {
+  margin-left: auto;
+  text-align: right;
+}

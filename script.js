@@ -680,8 +680,8 @@ function renderHome(content) {
           ${todayTimetable.length ? todayTimetable.map(item => `
             <div class="list-item today-timetable-item">
               <strong>${item.period}限</strong>
-              <span>${escapeHTML(item.subject)}</span>
-              ${item.changed ? `<span class="tag">変更</span>` : ""}
+              ${item.changed ? `<span class="tag today-timetable-changed">変更</span>` : ""}
+              <span class="today-timetable-subject">${escapeHTML(item.subject)}</span>
             </div>
           `).join("") : `<p class="muted">本日の授業はありません。</p>`}
         </div>
@@ -966,8 +966,22 @@ function renderMonthView(year, month) {
       </div>
     `).join("");
 
+    const weekBackgroundStops = days.map((day, index) => {
+      const dayOff = isDayOff(day.date, appData.events);
+      const color = day.outside
+        ? "#f4f5f7"
+        : dayOff
+          ? (day.key === today ? "#f8dddd" : "#fce8e8")
+          : day.key === today
+            ? "#f0f2ff"
+            : "#ffffff";
+      const start = (index / 7) * 100;
+      const end = ((index + 1) / 7) * 100;
+      return `${color} ${start}% ${end}%`;
+    }).join(", ");
+
     html += `
-      <div class="month-week">
+      <div class="month-week" style="background: linear-gradient(to right, ${weekBackgroundStops});">
         <div class="month-day-grid">
           ${dayCells}
         </div>

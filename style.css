@@ -379,3 +379,330 @@ textarea:focus {
     font-size: 9px;
   }
 }
+
+/* ======================================
+   TimeTree風カレンダー画面
+   ====================================== */
+
+/* 予定一覧ボタン */
+.event-list-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* 日付専用画面 */
+.calendar-detail-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.calendar-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.calendar-detail-date {
+  padding: 28px 0 24px;
+  border-bottom: 1px solid #e8ebf1;
+  margin-bottom: 24px;
+}
+
+.calendar-detail-date h2 {
+  font-size: 28px;
+  margin: 8px 0 4px;
+}
+
+.calendar-detail-date p {
+  margin: 0;
+}
+
+.event-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 12px;
+  border: none;
+  border-bottom: 1px solid #edf0f5;
+  background: transparent;
+  color: #202633;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.event-detail-row:hover {
+  background: #f8f9fc;
+}
+
+.event-detail-title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.event-color-mark {
+  display: inline-block;
+  flex: 0 0 5px;
+  width: 5px;
+  height: 34px;
+  border-radius: 5px;
+}
+
+.event-color-mark.event-blue {
+  background: #8db7f4;
+}
+
+.event-color-mark.event-green {
+  background: #8bc99a;
+}
+
+.event-color-mark.event-purple {
+  background: #b99be5;
+}
+
+.event-color-mark.event-red {
+  background: #e9a0a0;
+}
+
+.event-color-mark.event-orange {
+  background: #e9b36f;
+}
+
+.calendar-day-tasks {
+  margin-top: 30px;
+}
+
+/* 予定フォーム */
+.event-form-card,
+.event-detail-page {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.event-form-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.event-form-header .card-title {
+  margin: 0;
+}
+
+.event-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-field > label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #343b49;
+}
+
+.form-field input[type="text"],
+.form-field input[type="date"],
+.form-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 15px;
+  border: 1px solid #dce1ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #202633;
+  font: inherit;
+  font-size: 15px;
+}
+
+.form-field textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.form-field input:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #7888df;
+  box-shadow: 0 0 0 3px rgba(120, 136, 223, 0.13);
+}
+
+/* カテゴリー選択 */
+.event-category-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.event-category-option {
+  cursor: pointer;
+}
+
+.event-category-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.event-category-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 2px solid transparent;
+  border-radius: 9px;
+  color: #222;
+  font-size: 13px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.event-category-option input:checked + .event-category-chip {
+  border-color: #6879d5;
+  font-weight: 700;
+}
+
+.event-category-option input:focus-visible + .event-category-chip {
+  outline: 3px solid rgba(104, 121, 213, 0.25);
+}
+
+.event-category-chip.event-blue {
+  background: #e4efff;
+}
+
+.event-category-chip.event-green {
+  background: #e4f4e8;
+}
+
+.event-category-chip.event-purple {
+  background: #f0e8fc;
+}
+
+.event-category-chip.event-red {
+  background: #fce8e8;
+}
+
+.event-category-chip.event-orange {
+  background: #fff0df;
+}
+
+.event-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #edf0f5;
+}
+
+/* 予定詳細 */
+.event-detail-page > .secondary-button {
+  margin-bottom: 28px;
+}
+
+.event-detail-main {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 0;
+}
+
+.event-color-mark.large {
+  flex-basis: 7px;
+  width: 7px;
+  height: 64px;
+}
+
+.event-detail-main h2 {
+  margin: 6px 0;
+  font-size: 25px;
+  overflow-wrap: anywhere;
+}
+
+.event-detail-main p {
+  margin: 0;
+}
+
+.event-memo {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #f7f8fb;
+}
+
+.event-memo h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.event-memo p {
+  margin: 0;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.event-detail-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.danger-button {
+  color: #d34c4c;
+  border-color: #edcaca;
+}
+
+.danger-button:hover {
+  background: #fff3f3;
+}
+
+/* スマートフォン・小さい画面 */
+@media (max-width: 600px) {
+  .calendar-detail-header {
+    align-items: stretch;
+  }
+
+  .calendar-detail-header button {
+    flex: 1;
+  }
+
+  .calendar-detail-date h2 {
+    font-size: 24px;
+  }
+
+  .event-form-header {
+    flex-wrap: wrap;
+  }
+
+  .event-category-options {
+    gap: 8px;
+  }
+
+  .event-category-chip {
+    padding: 9px 11px;
+    font-size: 12px;
+  }
+
+  .event-form-actions,
+  .event-detail-actions {
+    flex-direction: column;
+  }
+
+  .event-form-actions button,
+  .event-detail-actions button {
+    width: 100%;
+  }
+}

@@ -1,20 +1,19 @@
 // Study 初期データ
 
 const studyData = {
-  // 予定
   events: [],
-
-  // 課題
   tasks: [],
-
-  // 教材
-  materials: [],
-
-  // 学習記録
-  records: [],
-
-  // テスト・成績
-  grades: []
+  timetable: {
+    weekly: {
+      1: ["", "", "", "", "", ""],
+      2: ["", "", "", "", "", ""],
+      3: ["", "", "", "", "", ""],
+      4: ["", "", "", "", "", "", ""],
+      5: ["", "", "", "", "", ""],
+      6: ["", "", "", "", "", ""]
+    },
+    changes: []
+  }
 };
 
 // データの保存・読み込み
@@ -24,25 +23,34 @@ const StudyStorage = {
       const saved = localStorage.getItem("studyData");
       if (saved) {
         const parsed = JSON.parse(saved);
+        const weeklyDefaults = JSON.parse(JSON.stringify(studyData.timetable.weekly));
+        const savedTimetable = parsed.timetable || {};
 
         return {
-          events: parsed.events || [],
-          tasks: parsed.tasks || [],
-          materials: parsed.materials || [],
-          records: parsed.records || [],
-          grades: parsed.grades || []
+          events: Array.isArray(parsed.events) ? parsed.events : [],
+          tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
+          timetable: {
+            weekly: { ...weeklyDefaults, ...(savedTimetable.weekly || {}) },
+            changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : []
+          }
         };
       }
     } catch (error) {
       console.error("データの読み込みに失敗しました", error);
     }
 
-    return studyData;
+    return JSON.parse(JSON.stringify(studyData));
   },
 
   save(data) {
     try {
-      localStorage.setItem("studyData", JSON.stringify(data));
+      // 教材管理・学習記録・成績分析の旧データは保存対象から除外
+      const cleanData = {
+        events: data.events || [],
+        tasks: data.tasks || [],
+        timetable: data.timetable || studyData.timetable
+      };
+      localStorage.setItem("studyData", JSON.stringify(cleanData));
       return true;
     } catch (error) {
       console.error("データの保存に失敗しました", error);

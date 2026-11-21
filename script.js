@@ -9,9 +9,7 @@ const pageNames = {
   home: "ホーム",
   calendar: "カレンダー",
   tasks: "課題管理",
-  materials: "教材管理",
-  records: "学習記録",
-  grades: "成績分析"
+  timetable: "時間割"
 };
 
 let currentPage = "home";
@@ -122,14 +120,8 @@ function showPage(page) {
     case "tasks":
       renderTasks(content);
       break;
-    case "materials":
-      renderMaterials(content);
-      break;
-    case "records":
-      renderRecords(content);
-      break;
-    case "grades":
-      renderGrades(content);
+    case "timetable":
+      renderTimetable(content);
       break;
   }
 }
@@ -558,10 +550,6 @@ function renderHome(content) {
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 5);
 
-  const totalMinutes = appData.records
-    .filter(item => item.date === today)
-    .reduce((sum, item) => sum + Number(item.minutes || 0), 0);
-
   content.innerHTML = `
     <div class="stat-grid">
       <div class="stat-card">
@@ -571,10 +559,6 @@ function renderHome(content) {
       <div class="stat-card">
         <div class="stat-label">未完了の課題</div>
         <div class="stat-value">${pendingTasks.length}<span class="muted"> 件</span></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">今日の学習時間</div>
-        <div class="stat-value">${Math.floor(totalMinutes / 60)}<span class="muted">時間</span>${totalMinutes % 60}<span class="muted">分</span></div>
       </div>
     </div>
 
@@ -608,7 +592,7 @@ function renderHome(content) {
 
       <div class="card wide">
         <h2 class="card-title">Studyへようこそ</h2>
-        <p class="muted">予定・課題・教材・学習記録をまとめて管理しよう。</p>
+        <p class="muted">予定と課題をまとめて管理しよう。</p>
         <button class="primary-button" onclick="showPage('calendar')">カレンダーを開く</button>
       </div>
     </div>
@@ -1049,27 +1033,15 @@ function renderCalendarDay() {
   const tasks = appData.tasks.filter(item => item.dueDate === selectedDate);
 
   content.innerHTML = `
-    <button
-      type="button"
-      class="calendar-day-edge-nav prev"
-      onclick="changeSelectedDay(-1)"
-      aria-label="前の日">
-      ‹
-    </button>
-
-    <button
-      type="button"
-      class="calendar-day-edge-nav next"
-      onclick="changeSelectedDay(1)"
-      aria-label="次の日">
-      ›
-    </button>
-
     <div class="card calendar-detail-page">
       <div class="calendar-detail-header">
-        <button class="secondary-button" onclick="returnToCalendar()">
-          ← カレンダーに戻る
-        </button>
+        <div class="calendar-return-group">
+          <button class="secondary-button" onclick="returnToCalendar()">
+            ← カレンダーに戻る
+          </button>
+          <button type="button" class="calendar-day-nav-button" onclick="changeSelectedDay(-1)" aria-label="前の日">‹</button>
+          <button type="button" class="calendar-day-nav-button" onclick="changeSelectedDay(1)" aria-label="次の日">›</button>
+        </div>
 
         <button class="primary-button" onclick="openEventForm()">
           ＋ 予定を追加
@@ -1534,194 +1506,268 @@ function deleteTask(index) {
   showPage("tasks");
 }
 
+
 // --------------------------------------
-// 教材管理
+// 時間割
 // --------------------------------------
 
-function renderMaterials(content) {
-  content.innerHTML = `
-    <div class="card">
-      <div class="calendar-toolbar">
-        <h2 class="card-title">教材一覧</h2>
-        <button class="primary-button" onclick="addMaterial()">＋ 教材を追加</button>
-      </div>
+const timetableDays = [
+  { number: 1, name: "月" },
+  { number: 2, name: "火" },
+  { number: 3, name: "水" },
+  { number: 4, name: "木" },
+  { number: 5, name: "金" },
+  { number: 6, name: "土" }
+];
 
-      <div class="item-list">
-        ${appData.materials.length ? appData.materials.map((item, index) => `
-          <div class="list-item">
-            <div>
-              <strong>${escapeHTML(item.title)}</strong>
-              <div class="muted">
-                ${escapeHTML(item.subject || "未分類")} ・ ${escapeHTML(item.type || "教材")}
-              </div>
-            </div>
+function ensureTimetableData() {
+  if (!appData.timetable) {
+    appData.timetable = JSON.parse(JSON.stringify(studyData.timetable));
+  }
+  if (!appData.timetable.weekly) {
+    appData.timetable.weekly = JSON.parse(JSON.stringify(studyData.timetable.weekly));
+  }
+  if (!Array.isArray(appData.timetable.changes)) {
+    appData.timetable.changes = [];
+  }
 
-            <button class="secondary-button" onclick="deleteMaterial(${index})">
-              削除
-            </button>
-          </div>
-        `).join("") : `<p class="muted">教材はまだ登録されていません。</p>`}
-      </div>
-    </div>
-  `;
-}
-
-function addMaterial() {
-  const title = prompt("教材名を入力してください");
-  if (!title) return;
-
-  const subject = prompt("教科を入力してください", "");
-  const type = prompt("種類を入力してください（教科書・問題集・プリントなど）", "教科書");
-
-  appData.materials.push({
-    id: Date.now(),
-    title,
-    subject: subject || "",
-    type: type || "教材"
+  timetableDays.forEach(day => {
+    const count = day.number === 4 ? 7 : 6;
+    if (!Array.isArray(appData.timetable.weekly[day.number])) {
+      appData.timetable.weekly[day.number] = Array(count).fill("");
+    }
+    appData.timetable.weekly[day.number] =
+      appData.timetable.weekly[day.number].slice(0, count);
+    while (appData.timetable.weekly[day.number].length < count) {
+      appData.timetable.weekly[day.number].push("");
+    }
   });
-
-  saveData();
-  showPage("materials");
 }
 
-function deleteMaterial(index) {
-  if (!confirm("この教材を削除しますか？")) return;
+function renderTimetable(content) {
+  ensureTimetableData();
 
-  appData.materials.splice(index, 1);
+  const maxPeriods = 7;
+  const weeklyRows = Array.from({ length: maxPeriods }, (_, periodIndex) => `
+    <tr>
+      <th class="timetable-period">${periodIndex + 1}限</th>
+      ${timetableDays.map(day => {
+        const subject = appData.timetable.weekly[day.number][periodIndex];
+        const exists = periodIndex < (day.number === 4 ? 7 : 6);
+        return exists ? `
+          <td>
+            <button class="timetable-cell" onclick="editWeeklySubject(${day.number}, ${periodIndex + 1})">
+              ${escapeHTML(subject || "＋")}
+            </button>
+          </td>
+        ` : `<td class="timetable-empty"></td>`;
+      }).join("")}
+    </tr>
+  `).join("");
 
-  saveData();
-  showPage("materials");
-}
-
-// --------------------------------------
-// 学習記録
-// --------------------------------------
-
-function renderRecords(content) {
-  const total = appData.records.reduce(
-    (sum, item) => sum + Number(item.minutes || 0),
-    0
-  );
+  const changes = appData.timetable.changes
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period);
 
   content.innerHTML = `
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">累計学習時間</div>
-        <div class="stat-value">${Math.floor(total / 60)}時間${total % 60}分</div>
+    <div class="card timetable-card">
+      <div class="calendar-toolbar">
+        <div>
+          <h2 class="card-title">通常時間割</h2>
+          <p class="muted">各マスをタップすると教科を登録・変更できます。</p>
+        </div>
       </div>
 
-      <div class="stat-card">
-        <div class="stat-label">記録件数</div>
-        <div class="stat-value">${appData.records.length}件</div>
+      <div class="timetable-scroll">
+        <table class="timetable-table">
+          <thead>
+            <tr>
+              <th>時限</th>
+              ${timetableDays.map(day => `<th>${day.name}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>${weeklyRows}</tbody>
+        </table>
+      </div>
+      <p class="muted timetable-note">木曜日のみ7限まで、ほかの曜日は6限までです。</p>
+    </div>
+
+    <div class="card timetable-card">
+      <h2 class="card-title">時間割変更</h2>
+      <p class="muted">特定の日の授業だけを変更できます。変更した授業には枠線が付きます。</p>
+
+      <form class="timetable-change-form" onsubmit="saveTimetableChange(event)">
+        <div class="form-field">
+          <label for="timetable-change-date">変更する日付</label>
+          <input id="timetable-change-date" type="date" value="${todayString()}" onchange="updateTimetablePeriodOptions(this.value)" required>
+        </div>
+        <div class="form-field">
+          <label for="timetable-change-period">何時間目</label>
+          <select id="timetable-change-period" required>
+            ${Array.from({length:7},(_,i)=>`<option value="${i+1}">${i+1}限</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="timetable-change-subject">変更後の教科</label>
+          <input id="timetable-change-subject" type="text" maxlength="30" placeholder="例：英語" required>
+        </div>
+        <button class="primary-button" type="submit">変更を保存</button>
+      </form>
+
+      <div class="timetable-change-list">
+        <h3 class="timetable-subtitle">登録済みの変更</h3>
+        ${changes.length ? changes.map(change => `
+          <div class="timetable-change-row">
+            <div>
+              <strong>${escapeHTML(change.date)}・${change.period}限</strong>
+              <div class="muted">${escapeHTML(change.subject)}</div>
+            </div>
+            <div class="timetable-change-actions">
+              <button class="secondary-button" onclick="editTimetableChange(${change.id})">編集</button>
+              <button class="secondary-button" onclick="deleteTimetableChange(${change.id})">削除</button>
+            </div>
+          </div>
+        `).join("") : `<p class="muted">時間割変更は登録されていません。</p>`}
       </div>
     </div>
 
-    <div class="card">
-      <div class="calendar-toolbar">
-        <h2 class="card-title">学習記録</h2>
-        <button class="primary-button" onclick="addRecord()">＋ 記録する</button>
+    <div class="card timetable-card">
+      <h2 class="card-title">日付ごとの時間割を確認</h2>
+      <div class="form-field">
+        <label for="timetable-preview-date">日付</label>
+        <input id="timetable-preview-date" type="date" value="${todayString()}" onchange="renderTimetablePreview(this.value)">
       </div>
-
-      <div class="item-list">
-        ${appData.records.length ? appData.records.slice().reverse().map(item => `
-          <div class="list-item">
-            <div>
-              <strong>${escapeHTML(item.subject || "自主学習")}</strong>
-              <div class="muted">
-                ${escapeHTML(item.date)} ・ ${escapeHTML(item.note || "")}
-              </div>
-            </div>
-
-            <span class="tag">${Number(item.minutes)}分</span>
-          </div>
-        `).join("") : `<p class="muted">学習記録はまだありません。</p>`}
-      </div>
+      <div id="timetable-preview">${renderTimetablePreviewHTML(todayString())}</div>
     </div>
   `;
 }
 
-function addRecord() {
-  const subject = prompt("教科を入力してください");
+function editWeeklySubject(dayNumber, period) {
+  ensureTimetableData();
+  const current = appData.timetable.weekly[dayNumber][period - 1] || "";
+  const dayName = timetableDays.find(day => day.number === dayNumber).name;
+  const subject = prompt(`${dayName}曜日 ${period}限の教科を入力してください。\\n空欄にすると未登録になります。`, current);
   if (subject === null) return;
 
-  const minutes = Number(prompt("学習時間を分単位で入力してください"));
+  appData.timetable.weekly[dayNumber][period - 1] = subject.trim();
+  saveData();
+  renderTimetable(document.getElementById("page-content"));
+}
 
-  if (!Number.isFinite(minutes) || minutes <= 0) {
-    alert("正しい学習時間を入力してください。");
+function updateTimetablePeriodOptions(date) {
+  const select = document.getElementById("timetable-change-period");
+  if (!select || !date) return;
+
+  const currentValue = Number(select.value || 1);
+  const dayNumber = parseDate(date).getDay();
+  const count = dayNumber === 4 ? 7 : 6;
+  select.innerHTML = Array.from(
+    { length: count },
+    (_, index) => `<option value="${index + 1}">${index + 1}限</option>`
+  ).join("");
+  select.value = String(Math.min(currentValue, count));
+}
+
+function saveTimetableChange(event) {
+  event.preventDefault();
+  ensureTimetableData();
+
+  const date = document.getElementById("timetable-change-date").value;
+  const period = Number(document.getElementById("timetable-change-period").value);
+  const subject = document.getElementById("timetable-change-subject").value.trim();
+
+  if (!date || !subject) return;
+
+  const dayNumber = parseDate(date).getDay();
+  if (dayNumber === 0) {
+    alert("日曜日は時間割の対象外です。");
+    return;
+  }
+  if (period > (dayNumber === 4 ? 7 : 6)) {
+    alert("その曜日には選択した時限がありません。");
     return;
   }
 
-  const note = prompt("学習内容（任意）", "");
+  const existing = appData.timetable.changes.find(
+    item => item.date === date && Number(item.period) === period
+  );
 
-  appData.records.push({
-    id: Date.now(),
-    date: todayString(),
-    subject: subject || "",
-    minutes,
-    note: note || ""
-  });
+  if (existing) {
+    existing.subject = subject;
+  } else {
+    appData.timetable.changes.push({
+      id: Date.now(),
+      date,
+      period,
+      subject
+    });
+  }
 
   saveData();
-  showPage("records");
+  renderTimetable(document.getElementById("page-content"));
 }
 
-// --------------------------------------
-// 成績分析
-// --------------------------------------
+function editTimetableChange(id) {
+  const item = appData.timetable.changes.find(change => change.id === id);
+  if (!item) return;
 
-function renderGrades(content) {
-  content.innerHTML = `
-    <div class="card">
-      <div class="calendar-toolbar">
-        <h2 class="card-title">成績一覧</h2>
-        <button class="primary-button" onclick="addGrade()">＋ 成績を追加</button>
-      </div>
+  const subject = prompt(`${item.date} ${item.period}限の変更後の教科`, item.subject);
+  if (subject === null) return;
+  if (!subject.trim()) {
+    alert("教科名を入力してください。");
+    return;
+  }
 
-      <div class="item-list">
-        ${appData.grades.length ? appData.grades.map(item => `
-          <div class="list-item">
-            <div>
-              <strong>${escapeHTML(item.subject)}</strong>
-              <div class="muted">
-                ${escapeHTML(item.testName)} ・ ${escapeHTML(item.date)}
-              </div>
-            </div>
+  item.subject = subject.trim();
+  saveData();
+  renderTimetable(document.getElementById("page-content"));
+}
 
-            <span class="tag">${escapeHTML(item.score)}点</span>
-          </div>
-        `).join("") : `<p class="muted">成績はまだ登録されていません。</p>`}
-      </div>
+function deleteTimetableChange(id) {
+  if (!confirm("この時間割変更を削除しますか？")) return;
+  appData.timetable.changes = appData.timetable.changes.filter(item => item.id !== id);
+  saveData();
+  renderTimetable(document.getElementById("page-content"));
+}
+
+function getTimetableForDate(date) {
+  ensureTimetableData();
+  const dayNumber = parseDate(date).getDay();
+  if (dayNumber === 0) return [];
+
+  const periods = appData.timetable.weekly[dayNumber] || [];
+  const count = dayNumber === 4 ? 7 : 6;
+
+  return Array.from({ length: count }, (_, index) => {
+    const change = appData.timetable.changes.find(
+      item => item.date === date && Number(item.period) === index + 1
+    );
+    return {
+      period: index + 1,
+      subject: change ? change.subject : (periods[index] || ""),
+      changed: Boolean(change)
+    };
+  });
+}
+
+function renderTimetablePreviewHTML(date) {
+  const dayNumber = parseDate(date).getDay();
+  if (dayNumber === 0) return `<p class="muted">日曜日は時間割がありません。</p>`;
+
+  return `
+    <div class="timetable-preview-list">
+      ${getTimetableForDate(date).map(item => `
+        <div class="timetable-preview-row ${item.changed ? "is-changed" : ""}">
+          <span class="timetable-preview-period">${item.period}限</span>
+          <span>${escapeHTML(item.subject || "未登録")}</span>
+          ${item.changed ? `<span class="timetable-changed-label">変更</span>` : ""}
+        </div>
+      `).join("")}
     </div>
   `;
 }
 
-function addGrade() {
-  const subject = prompt("教科を入力してください");
-  if (!subject) return;
-
-  const testName = prompt("テスト名を入力してください");
-  if (!testName) return;
-
-  const score = Number(prompt("点数を入力してください"));
-
-  if (!Number.isFinite(score) || score < 0) {
-    alert("正しい点数を入力してください。");
-    return;
-  }
-
-  const date = prompt(
-    "テスト日を入力してください（例：2026-11-20）",
-    todayString()
-  );
-
-  appData.grades.push({
-    id: Date.now(),
-    subject,
-    testName,
-    score,
-    date: date || ""
-  });
-
-  saveData();
-  showPage("grades");
+function renderTimetablePreview(date) {
+  const target = document.getElementById("timetable-preview");
+  if (target) target.innerHTML = renderTimetablePreviewHTML(date);
 }

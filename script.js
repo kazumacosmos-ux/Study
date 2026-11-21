@@ -891,6 +891,15 @@ function renderMonthView(year, month) {
       });
     });
 
+    // 週全体に敷く日付背景（日曜・祝日・前後月）
+    // 背景を各表示行ではなく週全体に敷くことで、途中の白い隙間を防ぐ
+    const weekBackgrounds = days.map(day => {
+      const outside = day.outside;
+      const dayOff = isDayOff(day.date, appData.events);
+      const className = outside ? "outside-month" : (dayOff ? "day-off" : "");
+      return `<span class="month-week-background ${className}"></span>`;
+    }).join("");
+
     // 日付の数字
     const dayCells = days.map(day => {
       const count = day.events.filter(item => !isClosureEvent(item)).length;
@@ -957,6 +966,9 @@ function renderMonthView(year, month) {
 
     html += `
       <div class="month-week">
+        <div class="month-week-backgrounds" aria-hidden="true">
+          ${weekBackgrounds}
+        </div>
         <div class="month-day-grid">
           ${dayCells}
         </div>

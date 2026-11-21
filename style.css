@@ -1648,3 +1648,51 @@ textarea:focus {
   .task-form-actions button { width: 100%; }
   .task-actions { flex-direction: column; align-items: stretch; }
 }
+
+/* 日付マスの背景を週全体に通す。連続した休みでも境界線は前面に残す */
+.month-week {
+  position: relative;
+  isolation: isolate;
+}
+.month-week-backgrounds {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  pointer-events: none;
+  z-index: 0;
+}
+.month-week-background {
+  min-width: 0;
+  background: #fff;
+}
+.month-week-background.day-off {
+  background: #fce8e8;
+}
+.month-week-background.outside-month {
+  background: #fafafa;
+}
+.month-day-grid,
+.month-event-grid,
+.month-task-grid {
+  position: relative;
+  z-index: 1;
+  background-color: transparent;
+}
+.month-day,
+.month-event-hit-target.day-off,
+.month-task-cell.day-off {
+  background-color: transparent !important;
+}
+.month-day.today {
+  background-color: #f0f2ff;
+}
+.month-day.day-off.today {
+  background-color: #f8dddd !important;
+}
+.month-day.outside-month {
+  background-color: transparent !important;
+}
+.month-day.today {
+  background-color: #f0f2ff !important;
+}

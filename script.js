@@ -9,6 +9,7 @@ const pageNames = {
   home: "ホーム",
   calendar: "カレンダー",
   tasks: "課題管理",
+  todo: "TODO",
   timetable: "時間割"
 };
 
@@ -194,6 +195,9 @@ function showPage(page) {
       break;
     case "tasks":
       renderTasks(content);
+      break;
+    case "todo":
+      renderTodo(content);
       break;
     case "timetable":
       renderTimetable(content);
@@ -671,6 +675,21 @@ function renderHome(content) {
               <span class="tag">${escapeHTML(item.subject || "未分類")}</span>
             </div>
           `).join("") : `<p class="muted">未完了の課題はありません。</p>`}
+        </div>
+      </div>
+
+      <div class="card wide">
+        <div class="calendar-toolbar">
+          <h2 class="card-title">TODO</h2>
+          <button class="secondary-button" onclick="showPage('todo')">TODOを管理</button>
+        </div>
+        <div class="todo-list item-list">
+          ${appData.todos.filter(item => !item.completed).length ? appData.todos.filter(item => !item.completed).map(item => `
+            <label class="todo-item">
+              <input type="checkbox" onchange="toggleTodo(${Number(item.id)}, this.checked)">
+              <span>${escapeHTML(item.text)}</span>
+            </label>
+          `).join("") : `<p class="muted">未完了のTODOはありません。</p>`}
         </div>
       </div>
 
@@ -1701,6 +1720,67 @@ function deleteTask(index) {
   showPage("tasks");
 }
 
+
+// --------------------------------------
+// TODO
+// --------------------------------------
+
+function renderTodo(content) {
+  const pending = appData.todos.filter(item => !item.completed);
+  const completed = appData.todos.filter(item => item.completed);
+  const renderItems = (items, isCompleted) => items.length ? items.map(item => `
+    <div class="todo-item todo-page-item ${isCompleted ? "is-completed" : ""}">
+      <label>
+        <input type="checkbox" ${isCompleted ? "checked" : ""} onchange="toggleTodo(${Number(item.id)}, this.checked)">
+        <span>${escapeHTML(item.text)}</span>
+      </label>
+      <button class="secondary-button" onclick="deleteTodo(${Number(item.id)})">削除</button>
+    </div>
+  `).join("") : `<p class="muted">${isCompleted ? "完了したTODOはありません。" : "TODOはありません。"}</p>`;
+
+  content.innerHTML = `
+    <div class="card">
+      <h2 class="card-title">TODOを追加</h2>
+      <form class="todo-add-form" onsubmit="addTodo(event)">
+        <input id="todo-input" type="text" maxlength="120" placeholder="やることを入力" required>
+        <button class="primary-button" type="submit">追加</button>
+      </form>
+      <section class="task-list-section">
+        <h3 class="task-section-title">未完了</h3>
+        <div class="todo-list">${renderItems(pending, false)}</div>
+      </section>
+      <section class="task-list-section completed-task-section">
+        <h3 class="task-section-title">完了</h3>
+        <div class="todo-list">${renderItems(completed, true)}</div>
+      </section>
+    </div>
+  `;
+}
+
+function addTodo(event) {
+  event.preventDefault();
+  const input = document.getElementById("todo-input");
+  const text = input.value.trim();
+  if (!text) return;
+  appData.todos.push({ id: Date.now(), text, completed: false });
+  saveData();
+  renderTodo(document.getElementById("page-content"));
+}
+
+function toggleTodo(id, completed) {
+  const item = appData.todos.find(todo => Number(todo.id) === Number(id));
+  if (!item) return;
+  item.completed = completed;
+  saveData();
+  if (currentPage === "todo") renderTodo(document.getElementById("page-content"));
+  else if (currentPage === "home") renderHome(document.getElementById("page-content"));
+}
+
+function deleteTodo(id) {
+  appData.todos = appData.todos.filter(todo => Number(todo.id) !== Number(id));
+  saveData();
+  renderTodo(document.getElementById("page-content"));
+}
 
 // --------------------------------------
 // 時間割

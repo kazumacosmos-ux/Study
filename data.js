@@ -3,6 +3,7 @@
 const studyData = {
   events: [],
   tasks: [],
+  todos: [],
   timetable: {
     weekly: {
       1: ["", "", "", "", "", "", ""],
@@ -29,6 +30,7 @@ const StudyStorage = {
         return {
           events: Array.isArray(parsed.events) ? parsed.events : [],
           tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
+          todos: Array.isArray(parsed.todos) ? parsed.todos : [],
           timetable: {
             weekly: { ...weeklyDefaults, ...(savedTimetable.weekly || {}) },
             changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : []
@@ -48,6 +50,7 @@ const StudyStorage = {
       const cleanData = {
         events: data.events || [],
         tasks: data.tasks || [],
+        todos: data.todos || [],
         timetable: data.timetable || studyData.timetable
       };
       localStorage.setItem("studyData", JSON.stringify(cleanData));

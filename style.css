@@ -1876,3 +1876,59 @@ textarea:focus {
   margin-left: auto;
   text-align: right;
 }
+
+/* TODO */
+.todo-add-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.todo-add-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 13px;
+  font: inherit;
+}
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.todo-item label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.todo-item label span {
+  overflow-wrap: anywhere;
+}
+.todo-page-item {
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.todo-page-item:last-child { border-bottom: 0; }
+.todo-page-item.is-completed label span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.todo-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+}
+@media (max-width: 600px) {
+  .todo-add-form { flex-direction: column; }
+  .todo-add-form button { width: 100%; }
+}

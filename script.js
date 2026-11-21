@@ -24,6 +24,7 @@ let detailEventId = null;
 // ドラッグコピー用
 let calendarDrag = null;
 let suppressNextEventClick = false;
+let copyToastTimer = null;
 
 // --------------------------------------
 // 初期化
@@ -140,7 +141,8 @@ function showCalendarScreen(title) {
 // --------------------------------------
 
 function setupZoomPrevention() {
-  // viewport設定
+  // ズームを無効化しない。
+  // ピンチによる拡大・縮小はブラウザ標準の操作に任せる。
   let viewport = document.querySelector('meta[name="viewport"]');
 
   if (!viewport) {
@@ -149,35 +151,7 @@ function setupZoomPrevention() {
     document.head.appendChild(viewport);
   }
 
-  viewport.content =
-    "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no";
-
-  // iOS Safariのジェスチャーズームを抑制
-  ["gesturestart", "gesturechange", "gestureend"].forEach(type => {
-    document.addEventListener(type, event => {
-      event.preventDefault();
-    }, { passive: false });
-  });
-
-  // 2本指のピンチ操作を抑制
-  document.addEventListener("touchmove", event => {
-    if (event.touches && event.touches.length > 1) {
-      event.preventDefault();
-    }
-  }, { passive: false });
-
-  // ダブルタップによるズームを抑制
-  let lastTouchEnd = 0;
-
-  document.addEventListener("touchend", event => {
-    const now = Date.now();
-
-    if (now - lastTouchEnd <= 300) {
-      event.preventDefault();
-    }
-
-    lastTouchEnd = now;
-  }, { passive: false });
+  viewport.content = "width=device-width, initial-scale=1";
 }
 
 // --------------------------------------
@@ -191,7 +165,7 @@ function setupCalendarStyles() {
   style.id = "study-calendar-custom-styles";
 
   style.textContent = `
-    /* 長押しによる文字選択を抑制 */
+    /* カレンダー上の文字選択を防止 */
     .month-calendar,
     .month-calendar * {
       -webkit-user-select: none;
@@ -219,6 +193,7 @@ function setupCalendarStyles() {
 
     .month-day.outside-month .month-day-number {
       color: #b8bec8;
+      background: #f1f2f4;
     }
 
     .month-day.outside-month .month-overflow {
@@ -230,7 +205,7 @@ function setupCalendarStyles() {
       position: fixed;
       z-index: 99999;
       pointer-events: none;
-      opacity: 0.85;
+      opacity: 0.9;
       padding: 7px 12px;
       border-radius: 7px;
       font-size: 13px;
@@ -246,6 +221,50 @@ function setupCalendarStyles() {
       outline: 2px solid #6b9fe8;
       outline-offset: -2px;
       background-color: #edf4ff;
+    }
+
+    /* コピー完了通知 */
+    .study-copy-toast {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 100000;
+      width: min(300px, calc(100vw - 36px));
+      padding: 12px 16px;
+      border: 1px solid #dce5f5;
+      border-radius: 11px;
+      background: #fff;
+      color: #20263a;
+      box-shadow: 0 5px 22px rgba(30, 45, 80, 0.16);
+      opacity: 0;
+      transform: translateX(25px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: none;
+    }
+
+    .study-copy-toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .study-copy-toast-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .study-copy-toast-detail {
+      font-size: 12px;
+      color: #737d91;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 600px) {
+      .study-copy-toast {
+        top: 12px;
+        right: 12px;
+        width: min(270px, calc(100vw - 24px));
+      }
     }
   `;
 
@@ -313,7 +332,6 @@ function setupCalendarInteractions() {
     if (!calendarDrag || !calendarDrag.active) return;
 
     event.preventDefault();
-
     moveCalendarDrag(event.clientX, event.clientY);
   }, { passive: false });
 
@@ -356,7 +374,6 @@ function startCalendarDrag() {
   if (!calendarDrag || calendarDrag.active) return;
 
   calendarDrag.active = true;
-
   calendarDrag.bar.classList.add("dragging");
 
   const ghost = document.createElement("div");
@@ -364,7 +381,6 @@ function startCalendarDrag() {
   ghost.textContent = calendarDrag.item.title;
 
   document.body.appendChild(ghost);
-
   calendarDrag.ghost = ghost;
 
   moveCalendarDrag(
@@ -483,7 +499,7 @@ function copyEventToDate(item, targetDate) {
     renderCalendar(document.getElementById("page-content"));
   }
 
-  alert(`「${item.title}」を${formatDate(parseDate(targetDate))}にコピーしました。`);
+  showCopyToast(item.title, targetDate);
 }
 
 function createUniqueEventId() {
@@ -494,6 +510,45 @@ function createUniqueEventId() {
   }
 
   return id;
+}
+
+function showCopyToast(title, targetDate) {
+  let toast = document.getElementById("study-copy-toast");
+
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "study-copy-toast";
+    toast.className = "study-copy-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    document.body.appendChild(toast);
+  }
+
+  const date = parseDate(targetDate);
+  const dateText = `${date.getMonth() + 1}月${date.getDate()}日`;
+
+  toast.innerHTML = `
+    <div class="study-copy-toast-title">
+      ${escapeHTML(dateText)}にコピーしました
+    </div>
+    <div class="study-copy-toast-detail">
+      ${escapeHTML(title)}
+    </div>
+  `;
+
+  toast.classList.remove("show");
+
+  if (copyToastTimer) {
+    clearTimeout(copyToastTimer);
+  }
+
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+
+  copyToastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 3000);
 }
 
 function handleMonthEventClick(event, id, date) {
@@ -730,11 +785,8 @@ function renderMonthView(year, month) {
         }
 
         // 複数日予定同士は期間が長い順
-        const aDuration =
-          parseDate(aEnd) - parseDate(aStart);
-
-        const bDuration =
-          parseDate(bEnd) - parseDate(bStart);
+        const aDuration = parseDate(aEnd) - parseDate(aStart);
+        const bDuration = parseDate(bEnd) - parseDate(bStart);
 
         if (aDuration !== bDuration) {
           return bDuration - aDuration;
@@ -945,6 +997,11 @@ function goToday() {
 // --------------------------------------
 
 function openCalendarDay(date) {
+  if (suppressNextEventClick) {
+    suppressNextEventClick = false;
+    return;
+  }
+
   selectedDate = date;
   calendarDate = parseDate(date);
   renderCalendarDay();

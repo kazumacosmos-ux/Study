@@ -62,6 +62,18 @@ function parseDate(value) {
   return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
+function getEventStart(item) {
+  return item.startDate || item.date || todayString();
+}
+
+function getEventEnd(item) {
+  return item.endDate || item.startDate || item.date || todayString();
+}
+
+function eventOccursOn(item, date) {
+  return date >= getEventStart(item) && date <= getEventEnd(item);
+}
+
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
     "&": "&amp;",
@@ -121,7 +133,7 @@ function showCalendarScreen(title) {
 
 function renderHome(content) {
   const today = todayString();
-  const todayEvents = appData.events.filter(item => item.date === today);
+  const todayEvents = appData.events.filter(item => eventOccursOn(item, today));
   const pendingTasks = appData.tasks.filter(item => item.status !== "completed");
 
   const upcomingTasks = pendingTasks
@@ -154,7 +166,7 @@ function renderHome(content) {
         <h2 class="card-title">今日の予定</h2>
         <div class="item-list">
           ${todayEvents.length ? todayEvents.map(item => `
-            <button class="list-item event-list-button" onclick="openEventDetail(${item.id})">
+            <button class="list-item event-list-button" onclick="openCalendarDay('${today}')">
               <strong>${escapeHTML(item.title)}</strong>
               <span class="tag">${escapeHTML(item.category || "その他")}</span>
             </button>
@@ -276,18 +288,22 @@ function renderMonthView(year, month) {
     const dateKey = dateString(date);
     const outside = date.getMonth() !== month;
 
-    const events = appData.events.filter(item => item.date === dateKey);
+    const events = appData.events.filter(item => eventOccursOn(item, dateKey));
     const tasks = appData.tasks.filter(item => item.dueDate === dateKey);
 
     cells += `
-      <div class="calendar-day ${dateKey === today ? "today" : ""} ${outside ? "outside-month" : ""}">
-        <button class="calendar-date" onclick="openCalendarDay('${dateKey}')">
+      <div class="calendar-day calendar-day-clickable ${dateKey === today ? "today" : ""} ${outside ? "outside-month" : ""}"
+        onclick="openCalendarDay('${dateKey}')"
+        role="button" tabindex="0"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openCalendarDay('${dateKey}')}">
+
+        <button class="calendar-date" type="button" onclick="event.stopPropagation();openCalendarDay('${dateKey}')">
           ${date.getDate()}
         </button>
 
         ${events.map(item => `
-          <button class="calendar-event ${getCategoryStyle(item.category)}"
-            onclick="openEventDetail(${item.id})">
+          <button type="button" class="calendar-event ${getCategoryStyle(item.category)}"
+            onclick="event.stopPropagation();openCalendarDay('${dateKey}')">
             ${escapeHTML(item.title)}
           </button>
         `).join("")}
@@ -332,7 +348,7 @@ function renderDayView() {
 
 function renderDayColumn(date) {
   const dateKey = dateString(date);
-  const events = appData.events.filter(item => item.date === dateKey);
+  const events = appData.events.filter(item => eventOccursOn(item, dateKey));
   const tasks = appData.tasks.filter(item => item.dueDate === dateKey);
 
   return `
@@ -344,7 +360,7 @@ function renderDayColumn(date) {
 
       ${events.length ? events.map(item => `
         <button class="calendar-event ${getCategoryStyle(item.category)}"
-          onclick="openEventDetail(${item.id})">
+          onclick="openCalendarDay('${dateKey}')">
           ${escapeHTML(item.title)}
         </button>
       `).join("") : `<p class="muted">予定はありません。</p>`}
@@ -387,6 +403,7 @@ function goToday() {
 
 function openCalendarDay(date) {
   selectedDate = date;
+  calendarDate = parseDate(date);
   renderCalendarDay();
 }
 
@@ -395,7 +412,7 @@ function renderCalendarDay() {
 
   const content = document.getElementById("page-content");
   const date = parseDate(selectedDate);
-  const events = appData.events.filter(item => item.date === selectedDate);
+  const events = appData.events.filter(item => eventOccursOn(item, selectedDate));
   const tasks = appData.tasks.filter(item => item.dueDate === selectedDate);
 
   content.innerHTML = `
@@ -467,6 +484,10 @@ function renderEventForm() {
     "その他"
   ];
 
+  const startDate = item ? getEventStart(item) : selectedDate;
+  const endDate = item ? getEventEnd(item) : selectedDate;
+  const isAllDay = item ? item.allDay !== false : true;
+
   content.innerHTML = `
     <div class="card event-form-card">
       <div class="event-form-header">
@@ -482,10 +503,39 @@ function renderEventForm() {
             value="${escapeHTML(item?.title || "")}" required>
         </div>
 
+        <div class="event-date-range">
+          <div class="form-field">
+            <label for="event-start-date">開始日</label>
+            <input id="event-start-date" name="startDate" type="date"
+              value="${escapeHTML(startDate)}" required>
+          </div>
+
+          <div class="form-field">
+            <label for="event-end-date">終了日</label>
+            <input id="event-end-date" name="endDate" type="date"
+              value="${escapeHTML(endDate)}" required>
+          </div>
+        </div>
+
         <div class="form-field">
-          <label for="event-date">日付</label>
-          <input id="event-date" name="date" type="date"
-            value="${escapeHTML(item?.date || selectedDate || todayString())}" required>
+          <label class="all-day-label">
+            <input id="event-all-day" name="allDay" type="checkbox" ${isAllDay ? "checked" : ""}>
+            終日
+          </label>
+        </div>
+
+        <div id="event-time-fields" class="event-time-fields" ${isAllDay ? "hidden" : ""}>
+          <div class="form-field">
+            <label for="event-start-time">開始時刻</label>
+            <input id="event-start-time" name="startTime" type="time"
+              value="${escapeHTML(item?.startTime || "")}" ${isAllDay ? "disabled" : ""}>
+          </div>
+
+          <div class="form-field">
+            <label for="event-end-time">終了時刻</label>
+            <input id="event-end-time" name="endTime" type="time"
+              value="${escapeHTML(item?.endTime || "")}" ${isAllDay ? "disabled" : ""}>
+          </div>
         </div>
 
         <div class="form-field">
@@ -515,6 +565,18 @@ function renderEventForm() {
     </div>
   `;
 
+  const allDayCheckbox = document.getElementById("event-all-day");
+  const timeFields = document.getElementById("event-time-fields");
+  const startTimeInput = document.getElementById("event-start-time");
+  const endTimeInput = document.getElementById("event-end-time");
+
+  allDayCheckbox.addEventListener("change", () => {
+    const allDay = allDayCheckbox.checked;
+    timeFields.hidden = allDay;
+    startTimeInput.disabled = allDay;
+    endTimeInput.disabled = allDay;
+  });
+
   document.getElementById("event-form").addEventListener("submit", saveEventForm);
   document.getElementById("event-title").focus();
 }
@@ -524,28 +586,46 @@ function saveEventForm(event) {
 
   const form = event.currentTarget;
   const title = form.elements.title.value.trim();
-  const date = form.elements.date.value;
-  const category = form.elements.category.value;
+  const startDate = form.elements.startDate.value;
+  const endDate = form.elements.endDate.value;
+  const allDay = form.elements.allDay.checked;
+  const startTime = allDay ? "" : form.elements.startTime.value;
+  const endTime = allDay ? "" : form.elements.endTime.value;
+  const categoryInput = form.querySelector('input[name="category"]:checked');
+  const category = categoryInput ? categoryInput.value : "";
   const memo = form.elements.memo.value.trim();
 
-  if (!title || !date || !category) {
-    alert("予定名・日付・カテゴリーを入力してください。");
+  if (!title || !startDate || !endDate || !category) {
+    alert("予定名・開始日・終了日・カテゴリーを入力してください。");
     return;
   }
 
-  const parsed = parseDate(date);
-  if (dateString(parsed) !== date) {
-    alert("正しい日付を入力してください。");
+  if (endDate < startDate) {
+    alert("終了日は開始日以降の日付にしてください。");
     return;
   }
+
+  if (!allDay && startTime && endTime && endTime < startTime && startDate === endDate) {
+    alert("同じ日の予定では、終了時刻を開始時刻より後にしてください。");
+    return;
+  }
+
+  const eventData = {
+    title,
+    date: startDate,
+    startDate,
+    endDate,
+    allDay,
+    startTime,
+    endTime,
+    category,
+    memo
+  };
 
   if (editingEventId === null) {
     appData.events.push({
       id: Date.now(),
-      title,
-      date,
-      category,
-      memo
+      ...eventData
     });
   } else {
     const index = appData.events.findIndex(item => item.id === editingEventId);
@@ -553,15 +633,12 @@ function saveEventForm(event) {
 
     appData.events[index] = {
       ...appData.events[index],
-      title,
-      date,
-      category,
-      memo
+      ...eventData
     };
   }
 
-  selectedDate = date;
-  calendarDate = parseDate(date);
+  selectedDate = startDate;
+  calendarDate = parseDate(startDate);
 
   saveData();
   renderCalendarDay();
@@ -592,10 +669,28 @@ function renderEventDetail() {
     return;
   }
 
-  selectedDate = item.date;
+  selectedDate = getEventStart(item);
   showCalendarScreen("予定の詳細");
 
   const content = document.getElementById("page-content");
+  const startDate = getEventStart(item);
+  const endDate = getEventEnd(item);
+  const dateText = startDate === endDate
+    ? formatDate(parseDate(startDate))
+    : `${formatDate(parseDate(startDate))} ～ ${formatDate(parseDate(endDate))}`;
+
+  let timeText = "終日";
+  if (item.allDay === false) {
+    if (item.startTime && item.endTime) {
+      timeText = `${item.startTime} ～ ${item.endTime}`;
+    } else if (item.startTime) {
+      timeText = `${item.startTime}から`;
+    } else if (item.endTime) {
+      timeText = `${item.endTime}まで`;
+    } else {
+      timeText = "時刻未設定";
+    }
+  }
 
   content.innerHTML = `
     <div class="card event-detail-page">
@@ -606,7 +701,8 @@ function renderEventDetail() {
         <div>
           <div class="muted">${escapeHTML(item.category || "その他")}</div>
           <h2>${escapeHTML(item.title)}</h2>
-          <p class="muted">${formatDate(parseDate(item.date))}</p>
+          <p class="muted">${escapeHTML(dateText)}</p>
+          <p class="muted">${escapeHTML(timeText)}</p>
         </div>
       </div>
 

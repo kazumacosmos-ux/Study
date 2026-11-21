@@ -477,9 +477,44 @@ textarea:focus {
   background: #e9b36f;
 }
 
+.event-color-mark.event-pink {
+  background: #e9a8c8;
+}
+
 .calendar-day-tasks {
   margin-top: 30px;
 }
+
+
+/* カレンダーの色分け一覧 */
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 20px;
+  color: #596273;
+  font-size: 12px;
+}
+
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.calendar-legend .legend-blue { background: #e4efff; }
+.calendar-legend .legend-green { background: #e4f4e8; }
+.calendar-legend .legend-purple { background: #f0e8fc; }
+.calendar-legend .legend-red { background: #fce8e8; }
+.calendar-legend .legend-orange { background: #fff0df; }
+.calendar-legend .legend-pink { background: #fbe4ef; }
 
 /* 予定フォーム */
 .event-form-card,
@@ -599,6 +634,10 @@ textarea:focus {
 
 .event-category-chip.event-orange {
   background: #fff0df;
+}
+
+.event-category-chip.event-pink {
+  background: #fbe4ef;
 }
 
 .event-form-actions {
@@ -953,6 +992,12 @@ textarea:focus {
 
 .month-event-bar.event-orange {
   background: #fff0df;
+}
+
+.month-event-bar.event-pink,
+.calendar-event.event-pink {
+  background: #fbe4ef;
+  color: #202633;
 }
 
 /* 週をまたぐ予定のつながり */

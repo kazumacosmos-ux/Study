@@ -612,7 +612,8 @@ function getCategoryStyle(category) {
     "小テスト・定期テスト": "event-green",
     "行事・イベント": "event-purple",
     "休校・休み": "event-red",
-    "その他": "event-orange"
+    "その他": "event-orange",
+    "部活動関係": "event-pink"
   };
 
   return styles[category] || "event-blue";
@@ -674,6 +675,7 @@ function renderCalendar(content) {
         <span><i class="legend-purple"></i>行事</span>
         <span><i class="legend-red"></i>休み</span>
         <span><i class="legend-orange"></i>その他</span>
+        <span><i class="legend-pink"></i>部活動</span>
       </div>
 
       <div class="calendar-add-area">
@@ -1115,7 +1117,8 @@ function renderEventForm() {
     "小テスト・定期テスト",
     "行事・イベント",
     "休校・休み",
-    "その他"
+    "その他",
+    "部活動関係"
   ];
 
   const startDate = item ? getEventStart(item) : selectedDate;

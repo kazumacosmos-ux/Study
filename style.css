@@ -706,3 +706,87 @@ textarea:focus {
     width: 100%;
   }
 }
+
+/* ======================================
+   予定の期間・時刻入力
+   ====================================== */
+
+/* 月カレンダーのマス全体をクリック可能にする */
+.calendar-day-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.calendar-day-clickable:hover {
+  background: #f5f7fc;
+}
+
+.calendar-day-clickable .calendar-date {
+  cursor: pointer;
+}
+
+.calendar-day-clickable .calendar-event {
+  cursor: pointer;
+}
+
+/* 開始日・終了日 */
+.event-date-range,
+.event-time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.event-time-fields[hidden] {
+  display: none !important;
+}
+
+/* 終日チェック */
+.all-day-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #343b49;
+}
+
+.all-day-label input {
+  width: 18px;
+  height: 18px;
+  accent-color: #6879d5;
+  cursor: pointer;
+}
+
+/* 日付・時刻入力欄 */
+.event-date-range input,
+.event-time-fields input {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #dce1ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #202633;
+  font: inherit;
+  font-size: 15px;
+}
+
+.event-date-range input:focus,
+.event-time-fields input:focus {
+  outline: none;
+  border-color: #7888df;
+  box-shadow: 0 0 0 3px rgba(120, 136, 223, 0.13);
+}
+
+/* 小さい画面 */
+@media (max-width: 600px) {
+  .event-date-range,
+  .event-time-fields {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}

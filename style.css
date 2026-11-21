@@ -1696,3 +1696,80 @@ textarea:focus {
 .month-day.today {
   background-color: #f0f2ff !important;
 }
+
+/* ======================================
+   月カレンダー罫線の最終調整
+   週内の全行で同じ位置に縦線を描画し、線切れ・二重線を防ぐ
+   ====================================== */
+.month-weekdays,
+.month-week {
+  position: relative;
+  border: 0 !important;
+  background-image: none !important;
+}
+
+.month-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.month-week {
+  isolation: isolate;
+}
+
+/* 曜日行の外枠・列境界 */
+.month-weekdays::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  border-left: 1.5px solid #333;
+  border-right: 1.5px solid #333;
+  border-bottom: 1.5px solid #333;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% / 7 - 1.5px),
+    #333 calc(100% / 7 - 1.5px),
+    #333 calc(100% / 7)
+  );
+}
+
+/* 週全体に一枚の罫線レイヤーを重ねる。内側の各行で線を描かない */
+.month-week::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  border-left: 1.5px solid #333;
+  border-right: 1.5px solid #333;
+  border-bottom: 1.5px solid #333;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% / 7 - 1.5px),
+    #333 calc(100% / 7 - 1.5px),
+    #333 calc(100% / 7)
+  );
+}
+
+/* 右端の二重線や行ごとのズレの原因になる個別の線を解除 */
+.month-day-grid,
+.month-event-grid,
+.month-task-grid {
+  background-image: none !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.month-day,
+.month-task-cell {
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.month-event-hit-target {
+  border: 0 !important;
+}

@@ -1488,3 +1488,50 @@ textarea:focus {
     font-size: 13px;
   }
 }
+
+/* 日曜日・祝日・休み登録日の背景 */
+.month-day.day-off,
+.month-day.day-off:hover {
+  background: #fce8e8;
+}
+
+.month-day.day-off.today {
+  background: #f8dddd;
+}
+
+.month-day.day-off .month-day-number {
+  background: #f5caca;
+  color: #8d3030;
+}
+
+.month-day.day-off.today .month-day-number {
+  background: #c85d5d;
+  color: #fff;
+}
+
+.calendar-column.day-off {
+  background: #fce8e8;
+  border-radius: 8px;
+}
+
+.calendar-column.day-off .calendar-column-date {
+  color: #963b3b;
+}
+
+.day-off-label {
+  margin: 10px 8px;
+  color: #963b3b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calendar-detail-date.day-off {
+  padding: 12px;
+  border-radius: 10px;
+  background: #fce8e8;
+}
+
+.month-event-hit-target.day-off,
+.month-task-cell.day-off {
+  background: #fce8e8;
+}

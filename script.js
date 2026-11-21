@@ -86,6 +86,78 @@ function getEventEnd(item) {
   return item.endDate || item.startDate || item.date || todayString();
 }
 
+// 日本の祝日（振替休日・国民の休日を含む）
+function getJapaneseHolidays(year) {
+  const holidays = new Set();
+  const add = (month, day) => holidays.add(dateString(new Date(year, month - 1, day)));
+  const nthMonday = (month, nth) => {
+    const first = new Date(year, month - 1, 1).getDay();
+    return 1 + (8 - first) % 7 + (nth - 1) * 7;
+  };
+  const vernal = Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  const autumn = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+
+  add(1, 1);
+  year >= 2000 ? add(1, nthMonday(1, 2)) : add(1, 15);
+  add(2, 11);
+  if (year >= 2020) add(2, 23);
+  add(3, vernal);
+  add(4, 29);
+  add(5, 3); add(5, 4); add(5, 5);
+
+  if (year === 2020) { add(7, 23); add(7, 24); }
+  else if (year === 2021) { add(7, 22); add(7, 23); }
+  else if (year >= 2003) add(7, nthMonday(7, 3));
+  else add(7, 20);
+
+  if (year === 2020) add(8, 10);
+  else if (year === 2021) add(8, 8);
+  else if (year >= 2016) add(8, 11);
+
+  year >= 2003 ? add(9, nthMonday(9, 3)) : add(9, 15);
+  add(9, autumn);
+
+  if (year >= 2000 && year !== 2020 && year !== 2021) add(10, nthMonday(10, 2));
+  else if (year < 2000) add(10, 10);
+  add(11, 3); add(11, 23);
+  if (year >= 1989 && year <= 2018) add(12, 23);
+
+  // 祝日に挟まれた日（国民の休日）
+  const base = [...holidays].sort();
+  for (let i = 0; i < base.length - 1; i++) {
+    const middle = parseDate(base[i]);
+    middle.setDate(middle.getDate() + 1);
+    const after = new Date(middle);
+    after.setDate(after.getDate() + 1);
+    if (dateString(after) === base[i + 1] && middle.getDay() !== 0) holidays.add(dateString(middle));
+  }
+
+  // 日曜日に当たる祝日の振替休日
+  [...holidays].sort().forEach(key => {
+    if (parseDate(key).getDay() !== 0) return;
+    const substitute = parseDate(key);
+    do { substitute.setDate(substitute.getDate() + 1); }
+    while (holidays.has(dateString(substitute)));
+    holidays.add(dateString(substitute));
+  });
+  return holidays;
+}
+
+function isJapaneseHoliday(date) {
+  return getJapaneseHolidays(date.getFullYear()).has(dateString(date));
+}
+
+function isClosureEvent(item) {
+  return item.category === "休校・休み";
+}
+
+function isDayOff(date, events = appData.events) {
+  const key = dateString(date);
+  return date.getDay() === 0 || isJapaneseHoliday(date) || events.some(item =>
+    isClosureEvent(item) && eventOccursOn(item, key)
+  );
+}
+
 function eventOccursOn(item, date) {
   return date >= getEventStart(item) && date <= getEventEnd(item);
 }
@@ -738,6 +810,7 @@ function renderMonthView(year, month) {
     // この週に関係する予定を取得
     const weekEvents = appData.events
       .filter(item =>
+        !isClosureEvent(item) &&
         getEventStart(item) <= weekDates[6] &&
         getEventEnd(item) >= weekDates[0]
       )
@@ -815,10 +888,11 @@ function renderMonthView(year, month) {
 
     // 日付の数字
     const dayCells = days.map(day => {
-      const count = day.events.length;
+      const count = day.events.filter(item => !isClosureEvent(item)).length;
+      const dayOff = isDayOff(day.date, appData.events);
 
       return `
-        <div class="month-day ${day.key === today ? "today" : ""} ${day.outside ? "outside-month" : ""}"
+        <div class="month-day ${day.key === today ? "today" : ""} ${day.outside ? "outside-month" : ""} ${dayOff ? "day-off" : ""}"
           data-date="${day.key}"
           onclick="openCalendarDay('${day.key}')"
           role="button"
@@ -837,7 +911,7 @@ function renderMonthView(year, month) {
     const eventHitTargets = days.map((day, index) => `
       <button
         type="button"
-        class="month-event-hit-target"
+        class="month-event-hit-target ${isDayOff(day.date, appData.events) ? "day-off" : ""}"
         data-date="${day.key}"
         style="grid-column: ${index + 1}; grid-row: 1 / 4;"
         aria-label="${day.date.getMonth() + 1}月${day.date.getDate()}日を開く"
@@ -868,7 +942,7 @@ function renderMonthView(year, month) {
 
     // 課題
     const taskCells = days.map(day => `
-      <div class="month-task-cell"
+      <div class="month-task-cell ${isDayOff(day.date, appData.events) ? "day-off" : ""}"
         onclick="openCalendarDay('${day.key}')">
         ${day.tasks.map(task => `
           <div class="month-task-label">課題：${escapeHTML(task.title)}</div>
@@ -931,18 +1005,18 @@ function renderDayColumn(date) {
   const tasks = appData.tasks.filter(item => item.dueDate === dateKey);
 
   return `
-    <div class="calendar-column">
+    <div class="calendar-column ${isDayOff(date, appData.events) ? "day-off" : ""}">
       <button class="calendar-column-date" onclick="openCalendarDay('${dateKey}')">
         ${date.getMonth() + 1}/${date.getDate()}
         (${["日", "月", "火", "水", "木", "金", "土"][date.getDay()]})
       </button>
 
-      ${events.length ? events.map(item => `
+      ${events.some(item => !isClosureEvent(item)) ? events.filter(item => !isClosureEvent(item)).map(item => `
         <button class="calendar-event ${getCategoryStyle(item.category)}"
           onclick="openCalendarDay('${dateKey}')">
           ${escapeHTML(item.title)}
         </button>
-      `).join("") : `<p class="muted">予定はありません。</p>`}
+      `).join("") : (isDayOff(date, appData.events) ? `<p class="day-off-label">休み</p>` : `<p class="muted">予定はありません。</p>`)}
 
       ${tasks.map(item => `
         <div class="calendar-event event-task">
@@ -1053,7 +1127,7 @@ function renderCalendarDay() {
         </button>
       </div>
 
-      <div class="calendar-detail-date">
+      <div class="calendar-detail-date ${isDayOff(date, appData.events) ? "day-off" : ""}">
         <div class="eyebrow">DAILY SCHEDULE</div>
         <h2>${formatDate(date)}</h2>
         <p class="muted">
@@ -1067,7 +1141,7 @@ function renderCalendarDay() {
         ${events.length ? events.map(item => `
           <button class="event-detail-row" onclick="openEventDetail(${item.id})">
             <span class="event-color-mark ${getCategoryStyle(item.category)}"></span>
-            <span class="event-detail-title">${escapeHTML(item.title)}</span>
+            <span class="event-detail-title">${isClosureEvent(item) ? "休み" : escapeHTML(item.title)}</span>
             <span class="muted">›</span>
           </button>
         `).join("") : `<p class="muted">この日の予定はありません。</p>`}
@@ -1136,7 +1210,7 @@ function renderEventForm() {
       </div>
 
       <form id="event-form" class="event-form">
-        <div class="form-field">
+        <div class="form-field" id="event-title-field">
           <label for="event-title">予定名</label>
           <input
             id="event-title"
@@ -1253,11 +1327,22 @@ function renderEventForm() {
 
   allDayCheckbox.addEventListener("change", () => {
     const allDay = allDayCheckbox.checked;
-
     timeFields.hidden = allDay;
     startTimeInput.disabled = allDay;
     endTimeInput.disabled = allDay;
   });
+
+  const titleField = document.getElementById("event-title-field");
+  const titleInput = document.getElementById("event-title");
+  const categoryInputs = document.querySelectorAll('input[name="category"]');
+  const updateClosureForm = () => {
+    const closure = document.querySelector('input[name="category"]:checked')?.value === "休校・休み";
+    titleField.hidden = closure;
+    titleInput.required = !closure;
+    if (closure) titleInput.value = "";
+  };
+  categoryInputs.forEach(input => input.addEventListener("change", updateClosureForm));
+  updateClosureForm();
 
   document.getElementById("event-form").addEventListener("submit", saveEventForm);
   document.getElementById("event-title").focus();
@@ -1280,7 +1365,9 @@ function saveEventForm(event) {
   const category = categoryInput ? categoryInput.value : "";
   const memo = form.elements.memo.value.trim();
 
-  if (!title || !startDate || !endDate || !category) {
+  const isClosure = category === "休校・休み";
+
+  if ((!title && !isClosure) || !startDate || !endDate || !category) {
     alert("予定名・開始日・終了日・カテゴリーを入力してください。");
     return;
   }
@@ -1392,7 +1479,7 @@ function renderEventDetail() {
 
         <div>
           <div class="muted">${escapeHTML(item.category || "その他")}</div>
-          <h2>${escapeHTML(item.title)}</h2>
+          <h2>${isClosureEvent(item) ? "休み" : escapeHTML(item.title)}</h2>
           <p class="muted">${escapeHTML(dateText)}</p>
           <p class="muted">${escapeHTML(timeText)}</p>
         </div>

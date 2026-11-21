@@ -500,19 +500,24 @@ function moveCalendarDrag(x, y) {
 }
 
 function findCalendarDateAtPoint(x, y) {
-  const cells = document.querySelectorAll(".month-day");
+  // 日付数字の欄だけでなく、同じ週の予定欄・課題欄も含めて
+  // 7列それぞれのマス全体をドロップ判定にする。
+  const weeks = document.querySelectorAll(".month-week");
 
-  for (const cell of cells) {
-    const rect = cell.getBoundingClientRect();
+  for (const week of weeks) {
+    const rect = week.getBoundingClientRect();
+    if (y < rect.top || y > rect.bottom || x < rect.left || x > rect.right) continue;
 
-    if (
-      x >= rect.left &&
-      x <= rect.right &&
-      y >= rect.top &&
-      y <= rect.bottom
-    ) {
-      return cell.dataset.date || null;
-    }
+    const dayGrid = week.querySelector(".month-day-grid");
+    if (!dayGrid) continue;
+
+    const gridRect = dayGrid.getBoundingClientRect();
+    const dayCells = Array.from(dayGrid.querySelectorAll(".month-day"));
+    if (!dayCells.length || gridRect.width <= 0) continue;
+
+    const columnWidth = gridRect.width / 7;
+    const column = Math.max(0, Math.min(6, Math.floor((x - gridRect.left) / columnWidth)));
+    return dayCells[column]?.dataset.date || null;
   }
 
   return null;
@@ -656,7 +661,7 @@ function renderHome(content) {
           ${upcomingTasks.length ? upcomingTasks.map(item => `
             <div class="list-item">
               <div>
-                <strong>${escapeHTML(item.title)}</strong>
+                <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
                 <div class="muted">期限：${escapeHTML(item.dueDate)}</div>
               </div>
               <span class="tag">${escapeHTML(item.subject || "未分類")}</span>
@@ -945,7 +950,7 @@ function renderMonthView(year, month) {
       <div class="month-task-cell ${isDayOff(day.date, appData.events) ? "day-off" : ""}"
         onclick="openCalendarDay('${day.key}')">
         ${day.tasks.map(task => `
-          <div class="month-task-label">課題：${escapeHTML(task.title)}</div>
+          <div class="month-task-label">課題：${escapeHTML(task.title || task.range || "課題")}</div>
         `).join("")}
       </div>
     `).join("");
@@ -1020,7 +1025,7 @@ function renderDayColumn(date) {
 
       ${tasks.map(item => `
         <div class="calendar-event event-task">
-          課題：${escapeHTML(item.title)}
+          課題：${escapeHTML(item.title || item.range || "課題")}
         </div>
       `).join("")}
 
@@ -1533,22 +1538,21 @@ function renderTasks(content) {
         ${appData.tasks.length ? appData.tasks.map((item, index) => `
           <div class="list-item">
             <div>
-              <strong>${escapeHTML(item.title)}</strong>
+              <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
               <div class="muted">
                 ${escapeHTML(item.subject || "未分類")} ・ 期限：${escapeHTML(item.dueDate || "未設定")}
               </div>
+              ${item.range ? `<div class="task-range-preview">${escapeHTML(item.range).replace(/\\n/g, "<br>")}</div>` : ""}
+              ${item.memo ? `<div class="muted task-memo-preview">${escapeHTML(item.memo).replace(/\\n/g, "<br>")}</div>` : ""}
             </div>
 
-            <div>
+            <div class="task-actions">
               <select onchange="changeTaskStatus(${index}, this.value)">
                 <option value="notStarted" ${item.status === "notStarted" ? "selected" : ""}>未着手</option>
                 <option value="inProgress" ${item.status === "inProgress" ? "selected" : ""}>進行中</option>
                 <option value="completed" ${item.status === "completed" ? "selected" : ""}>完了</option>
               </select>
-
-              <button class="secondary-button" onclick="deleteTask(${index})">
-                削除
-              </button>
+              <button class="secondary-button" onclick="deleteTask(${index})">削除</button>
             </div>
           </div>
         `).join("") : `<p class="muted">まだ課題は登録されていません。</p>`}
@@ -1558,22 +1562,78 @@ function renderTasks(content) {
 }
 
 function addTask() {
-  const title = prompt("課題の内容を入力してください");
-  if (!title) return;
+  renderTaskForm();
+}
 
-  const subject = prompt("教科を入力してください（例：数学）", "");
-  const dueDate = prompt("期限を入力してください（例：2026-11-25）", todayString());
+function renderTaskForm() {
+  const content = document.getElementById("page-content");
+  const subjects = [...new Set(appData.tasks.map(task => (task.subject || "").trim()).filter(Boolean))];
 
-  if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-    alert("日付の形式が正しくありません。");
-    return;
-  }
+  content.innerHTML = `
+    <div class="task-form-page">
+      <div class="task-form-header">
+        <button class="secondary-button" onclick="showPage('tasks')">← 課題一覧に戻る</button>
+        <h2>課題を追加</h2>
+        <p class="muted">必要な情報を入力してください。</p>
+      </div>
+
+      <form class="task-form-card" onsubmit="submitTaskForm(event)">
+        <label class="task-form-field">
+          <span>課題名 <small>任意</small></span>
+          <input type="text" id="task-title" placeholder="例：夏休み課題">
+        </label>
+
+        <label class="task-form-field">
+          <span>教科</span>
+          <input type="text" id="task-subject" list="task-subject-options" placeholder="教科を入力" required>
+          <datalist id="task-subject-options">
+            ${subjects.map(subject => `<option value="${escapeHTML(subject)}"></option>`).join("")}
+          </datalist>
+        </label>
+
+        <label class="task-form-field">
+          <span>課題の範囲</span>
+          <textarea id="task-range" rows="4" placeholder="例：4STEP P.20〜30" required></textarea>
+        </label>
+
+        <label class="task-form-field">
+          <span>提出期限</span>
+          <input type="date" id="task-due-date" value="${todayString()}" required>
+        </label>
+
+        <label class="task-form-field">
+          <span>メモ <small>任意</small></span>
+          <textarea id="task-memo" rows="3" placeholder="補足事項など"></textarea>
+        </label>
+
+        <div class="task-form-actions">
+          <button type="button" class="secondary-button" onclick="showPage('tasks')">キャンセル</button>
+          <button type="submit" class="primary-button">課題を登録</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.getElementById("page-title").textContent = "課題を追加";
+}
+
+function submitTaskForm(event) {
+  event.preventDefault();
+
+  const title = document.getElementById("task-title").value.trim();
+  const subject = document.getElementById("task-subject").value.trim();
+  const range = document.getElementById("task-range").value.trim();
+  const dueDate = document.getElementById("task-due-date").value;
+  const memo = document.getElementById("task-memo").value.trim();
+
+  if (!subject || !range || !dueDate) return;
 
   appData.tasks.push({
     id: Date.now(),
     title,
-    subject: subject || "",
-    dueDate: dueDate || "",
+    subject,
+    range,
+    dueDate,
+    memo,
     status: "notStarted"
   });
 

@@ -1535,3 +1535,116 @@ textarea:focus {
 .month-task-cell.day-off {
   background: #fce8e8;
 }
+
+
+/* 課題の専用入力画面 */
+.task-form-page {
+  max-width: 760px;
+  margin: 0 auto;
+}
+.task-form-header {
+  margin-bottom: 18px;
+}
+.task-form-header h2 {
+  margin: 18px 0 5px;
+  font-size: 22px;
+}
+.task-form-card {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #d8dce5;
+  border-radius: 14px;
+  box-shadow: 0 3px 12px rgba(25, 35, 60, 0.05);
+}
+.task-form-field {
+  display: grid;
+  gap: 8px;
+  color: #20263a;
+  font-size: 14px;
+  font-weight: 600;
+}
+.task-form-field small {
+  margin-left: 5px;
+  color: #8991a5;
+  font-weight: 400;
+}
+.task-form-field input,
+.task-form-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 12px;
+  border: 1px solid #cbd0da;
+  border-radius: 8px;
+  background: #fff;
+  color: #20263a;
+  font: inherit;
+  font-weight: 400;
+}
+.task-form-field textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+.task-form-field input:focus,
+.task-form-field textarea:focus {
+  outline: 2px solid #aab4f0;
+  border-color: #5969d9;
+}
+.task-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 5px;
+}
+.task-range-preview,
+.task-memo-preview {
+  margin-top: 5px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 月カレンダーの罫線を少し太く、濃く */
+.month-weekdays {
+  border-color: #333 !important;
+}
+.month-week {
+  border-color: #333 !important;
+}
+.month-weekdays,
+.month-day-grid,
+.month-event-grid,
+.month-task-grid {
+  background-image: linear-gradient(
+    to right,
+    transparent calc(100% - 1.5px),
+    #333 calc(100% - 1.5px)
+  ) !important;
+  background-size: calc(100% / 7) 100%;
+  background-repeat: repeat-x;
+}
+.month-week {
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+  border-right-width: 1.5px;
+}
+/* 日曜・祝日の赤背景を各段で同じ色に統一 */
+.month-day.day-off,
+.month-event-hit-target.day-off,
+.month-task-cell.day-off {
+  background-color: #fce8e8 !important;
+}
+.month-day.day-off.today {
+  background-color: #f8dddd !important;
+}
+@media (max-width: 600px) {
+  .task-form-card { padding: 16px; }
+  .task-form-actions { flex-direction: column-reverse; }
+  .task-form-actions button { width: 100%; }
+  .task-actions { flex-direction: column; align-items: stretch; }
+}

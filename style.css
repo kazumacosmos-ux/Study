@@ -790,3 +790,194 @@ textarea:focus {
     gap: 18px;
   }
 }
+
+/* ======================================
+   月カレンダー・横長予定表示
+   ====================================== */
+
+.month-calendar {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.month-weekdays,
+.month-day-grid,
+.month-event-grid,
+.month-task-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.month-weekdays {
+  border-bottom: 1px solid #e4e8f0;
+}
+
+.month-weekdays .calendar-weekday {
+  text-align: left;
+  padding: 8px 4px;
+}
+
+.month-week {
+  border-bottom: 1px solid #e1e6ef;
+}
+
+.month-day {
+  min-width: 0;
+  min-height: 43px;
+  padding: 8px 6px 4px;
+  border-right: 1px solid #e1e6ef;
+  cursor: pointer;
+}
+
+.month-day:first-child {
+  border-left: 1px solid #e1e6ef;
+}
+
+.month-day:hover {
+  background: #f6f8fc;
+}
+
+.month-day.today {
+  background: #f0f2ff;
+}
+
+.month-day.outside-month {
+  color: #aab0bd;
+}
+
+.month-day-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.month-day-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 20px;
+  background: #eeeeef;
+  color: #202633;
+  font-size: 14px;
+}
+
+.month-day.today .month-day-number {
+  background: #6576dc;
+  color: #fff;
+}
+
+.month-overflow {
+  display: inline-block;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: #fff0d9;
+  color: #a65d13;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 予定の帯を縦に並べる */
+.month-event-grid {
+  grid-template-rows: repeat(3, minmax(25px, auto));
+  grid-auto-flow: row;
+  row-gap: 3px;
+  padding: 2px 0 6px;
+  border-left: 1px solid #e1e6ef;
+  border-right: 1px solid #e1e6ef;
+}
+
+.month-event-bar {
+  min-width: 0;
+  height: 25px;
+  padding: 3px 7px;
+  border: none;
+  border-radius: 4px;
+  color: #202633;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.month-event-bar.event-blue {
+  background: #e4efff;
+}
+
+.month-event-bar.event-green {
+  background: #e4f4e8;
+}
+
+.month-event-bar.event-purple {
+  background: #f0e8fc;
+}
+
+.month-event-bar.event-red {
+  background: #fce8e8;
+}
+
+.month-event-bar.event-orange {
+  background: #fff0df;
+}
+
+/* 週をまたぐ予定のつながり */
+.month-event-bar.continues-before {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.month-event-bar.continues-after {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* 課題 */
+.month-task-grid {
+  border-left: 1px solid #e1e6ef;
+  border-right: 1px solid #e1e6ef;
+}
+
+.month-task-cell {
+  min-width: 0;
+  padding: 2px 4px 7px;
+  border-right: 1px solid #e1e6ef;
+}
+
+.month-task-label {
+  margin-top: 3px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  background: #f0f1f5;
+  color: #444b59;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .month-day {
+    padding: 6px 3px 3px;
+  }
+
+  .month-day-number {
+    min-width: 25px;
+    height: 23px;
+    font-size: 12px;
+  }
+
+  .month-overflow {
+    font-size: 9px;
+    padding: 3px 4px;
+  }
+
+  .month-event-bar {
+    font-size: 10px;
+    padding: 3px 4px;
+  }
+}

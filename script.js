@@ -1,3 +1,4 @@
+
 // ======================================
 // Study - 学習管理システム
 // ======================================
@@ -23,10 +24,13 @@ let detailEventId = null;
 // ドラッグコピー用
 let calendarDrag = null;
 let suppressNextEventClick = false;
-let copyToastTimer = null;
+let suppressClickTimer = null;
 
-// カレンダー復帰時のスクロール位置
+// カレンダー復帰用
 let calendarReturnScrollY = 0;
+
+// コピー通知用
+let copyToastTimer = null;
 
 // --------------------------------------
 // 初期化
@@ -143,8 +147,10 @@ function showCalendarScreen(title) {
 // --------------------------------------
 
 function setupZoomPrevention() {
-  // ズームを無効化しない。
-  // ピンチによる拡大・縮小はブラウザ標準の操作に任せる。
+  // ズームを一律禁止しない。
+  // iPad Safariではズームアウトだけを許可する制御は
+  // 安定して実現できないため、標準のズーム操作を維持する。
+
   let viewport = document.querySelector('meta[name="viewport"]');
 
   if (!viewport) {
@@ -167,6 +173,7 @@ function setupCalendarStyles() {
   style.id = "study-calendar-custom-styles";
 
   style.textContent = `
+    /* カレンダー上の文字選択を抑制 */
     .month-calendar,
     .month-calendar * {
       -webkit-user-select: none;
@@ -174,6 +181,7 @@ function setupCalendarStyles() {
       -webkit-touch-callout: none;
     }
 
+    /* ドラッグ操作 */
     .month-event-bar {
       -webkit-user-select: none;
       user-select: none;
@@ -186,24 +194,22 @@ function setupCalendarStyles() {
       opacity: 0.45;
     }
 
-    .outside-month {
-      background-color: #fafafa;
-    }
-
+    /* 前後の月の日付 */
     .month-day.outside-month .month-day-number {
-      color: #b8bec8;
-      background: #f1f2f4;
+      color: #c2c7d0;
+      background: #f4f5f7;
     }
 
     .month-day.outside-month .month-overflow {
-      opacity: 0.55;
+      opacity: 0.45;
     }
 
+    /* ドラッグ中の表示 */
     .study-drag-ghost {
       position: fixed;
       z-index: 99999;
       pointer-events: none;
-      opacity: 0.9;
+      opacity: 0.85;
       padding: 7px 12px;
       border-radius: 7px;
       font-size: 13px;
@@ -220,52 +226,52 @@ function setupCalendarStyles() {
       outline-offset: -2px;
       background-color: #edf4ff;
     }
-
-    .study-copy-toast {
-      position: fixed;
-      top: 18px;
-      right: 18px;
-      z-index: 100000;
-      width: min(300px, calc(100vw - 36px));
-      padding: 12px 16px;
-      border: 1px solid #dce5f5;
-      border-radius: 11px;
-      background: #fff;
-      color: #20263a;
-      box-shadow: 0 5px 22px rgba(30, 45, 80, 0.16);
-      opacity: 0;
-      transform: translateX(25px);
-      transition: opacity 0.25s ease, transform 0.25s ease;
-      pointer-events: none;
-    }
-
-    .study-copy-toast.show {
-      opacity: 1;
-      transform: translateX(0);
-    }
-
-    .study-copy-toast-title {
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-
-    .study-copy-toast-detail {
-      font-size: 12px;
-      color: #737d91;
-      overflow-wrap: anywhere;
-    }
-
-    @media (max-width: 600px) {
-      .study-copy-toast {
-        top: 12px;
-        right: 12px;
-        width: min(270px, calc(100vw - 24px));
-      }
-    }
   `;
 
   document.head.appendChild(style);
+}
+
+// --------------------------------------
+// コピー完了通知
+// --------------------------------------
+
+function showCopyToast(title, targetDate) {
+  let toast = document.getElementById("study-copy-toast");
+
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "study-copy-toast";
+    toast.className = "study-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+
+    document.body.appendChild(toast);
+  }
+
+  const date = parseDate(targetDate);
+
+  toast.innerHTML = `
+    <div class="study-toast-title">
+      ${date.getMonth() + 1}月${date.getDate()}日にコピーしました
+    </div>
+    <div class="study-toast-message">
+      ${escapeHTML(title)}
+    </div>
+  `;
+
+  toast.classList.remove("show");
+
+  if (copyToastTimer) {
+    clearTimeout(copyToastTimer);
+  }
+
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+
+  copyToastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2800);
 }
 
 // --------------------------------------
@@ -298,6 +304,7 @@ function setupCalendarInteractions() {
     if (event.pointerType === "mouse") {
       startCalendarDrag();
     } else {
+      // タッチ操作では長押ししてからドラッグ開始
       calendarDrag.timer = setTimeout(() => {
         if (calendarDrag) {
           startCalendarDrag();
@@ -316,6 +323,7 @@ function setupCalendarInteractions() {
         event.clientY - calendarDrag.startY
       );
 
+      // 長押しが成立する前に動かした場合は通常操作に戻す
       if (distance > 10 && calendarDrag.timer) {
         clearTimeout(calendarDrag.timer);
         calendarDrag.timer = null;
@@ -327,6 +335,7 @@ function setupCalendarInteractions() {
     if (!calendarDrag || !calendarDrag.active) return;
 
     event.preventDefault();
+
     moveCalendarDrag(event.clientX, event.clientY);
   }, { passive: false });
 
@@ -346,11 +355,16 @@ function setupCalendarInteractions() {
 
       if (targetDate) {
         copyEventToDate(calendarDrag.item, targetDate);
+
         suppressNextEventClick = true;
 
-        setTimeout(() => {
+        if (suppressClickTimer) {
+          clearTimeout(suppressClickTimer);
+        }
+
+        suppressClickTimer = setTimeout(() => {
           suppressNextEventClick = false;
-        }, 400);
+        }, 500);
       }
 
       finishCalendarDrag();
@@ -373,6 +387,7 @@ function startCalendarDrag() {
   if (!calendarDrag || calendarDrag.active) return;
 
   calendarDrag.active = true;
+
   calendarDrag.bar.classList.add("dragging");
 
   const ghost = document.createElement("div");
@@ -380,6 +395,7 @@ function startCalendarDrag() {
   ghost.textContent = calendarDrag.item.title;
 
   document.body.appendChild(ghost);
+
   calendarDrag.ghost = ghost;
 
   moveCalendarDrag(
@@ -432,24 +448,6 @@ function findCalendarDateAtPoint(x, y) {
     }
   }
 
-  // 予定欄・課題欄の空白部分も日付として判定する
-  const targets = document.querySelectorAll(
-    ".month-event-hit-target, .month-task-cell"
-  );
-
-  for (const target of targets) {
-    const rect = target.getBoundingClientRect();
-
-    if (
-      x >= rect.left &&
-      x <= rect.right &&
-      y >= rect.top &&
-      y <= rect.bottom
-    ) {
-      return target.dataset.date || null;
-    }
-  }
-
   return null;
 }
 
@@ -494,6 +492,7 @@ function copyEventToDate(item, targetDate) {
   newEnd.setDate(newEnd.getDate() + duration);
 
   const newEndDate = dateString(newEnd);
+
   const newId = createUniqueEventId();
 
   const copiedEvent = {
@@ -528,50 +527,17 @@ function createUniqueEventId() {
   return id;
 }
 
-function showCopyToast(title, targetDate) {
-  let toast = document.getElementById("study-copy-toast");
-
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "study-copy-toast";
-    toast.className = "study-copy-toast";
-    toast.setAttribute("role", "status");
-    toast.setAttribute("aria-live", "polite");
-    document.body.appendChild(toast);
-  }
-
-  const date = parseDate(targetDate);
-  const dateText = `${date.getMonth() + 1}月${date.getDate()}日`;
-
-  toast.innerHTML = `
-    <div class="study-copy-toast-title">
-      ${escapeHTML(dateText)}にコピーしました
-    </div>
-    <div class="study-copy-toast-detail">
-      ${escapeHTML(title)}
-    </div>
-  `;
-
-  toast.classList.remove("show");
-
-  if (copyToastTimer) {
-    clearTimeout(copyToastTimer);
-  }
-
-  requestAnimationFrame(() => {
-    toast.classList.add("show");
-  });
-
-  copyToastTimer = setTimeout(() => {
-    toast.classList.remove("show");
-  }, 3000);
-}
-
 function handleMonthEventClick(event, id, date) {
   event.stopPropagation();
 
   if (suppressNextEventClick) {
     suppressNextEventClick = false;
+
+    if (suppressClickTimer) {
+      clearTimeout(suppressClickTimer);
+      suppressClickTimer = null;
+    }
+
     return;
   }
 
@@ -780,6 +746,7 @@ function renderMonthView(year, month) {
       });
     }
 
+    // この週に関係する予定を取得
     const weekEvents = appData.events
       .filter(item =>
         getEventStart(item) <= weekDates[6] &&
@@ -794,12 +761,17 @@ function renderMonthView(year, month) {
         const aMulti = aStart !== aEnd;
         const bMulti = bStart !== bEnd;
 
+        // 複数日予定を優先
         if (aMulti !== bMulti) {
           return aMulti ? -1 : 1;
         }
 
-        const aDuration = parseDate(aEnd) - parseDate(aStart);
-        const bDuration = parseDate(bEnd) - parseDate(bStart);
+        // 複数日予定同士は期間が長い順
+        const aDuration =
+          parseDate(aEnd) - parseDate(aStart);
+
+        const bDuration =
+          parseDate(bEnd) - parseDate(bStart);
 
         if (aDuration !== bDuration) {
           return bDuration - aDuration;
@@ -808,6 +780,7 @@ function renderMonthView(year, month) {
         return aStart.localeCompare(bStart);
       });
 
+    // 予定を最大3段に配置
     const lanes = [[], [], []];
     const visibleEvents = [];
 
@@ -851,6 +824,7 @@ function renderMonthView(year, month) {
       });
     });
 
+    // 日付の数字
     const dayCells = days.map(day => {
       const count = day.events.length;
 
@@ -870,17 +844,19 @@ function renderMonthView(year, month) {
       `;
     }).join("");
 
-    // 予定欄の各日付に透明なクリック領域を設置
-    const eventHitTargets = days.map(day => `
+    // 予定欄の空白部分をクリックできるようにする
+    const eventHitTargets = days.map((day, index) => `
       <button
         type="button"
         class="month-event-hit-target"
         data-date="${day.key}"
-        aria-label="${day.date.getMonth() + 1}月${day.date.getDate日}日を開く"
+        style="grid-column: ${index + 1}; grid-row: 1 / 4;"
+        aria-label="${day.date.getMonth() + 1}月${day.date.getDate()}日を開く"
         onclick="openCalendarDay('${day.key}')">
       </button>
     `).join("");
 
+    // 予定の帯
     const eventBars = visibleEvents.map(({ item, startIndex, endIndex, laneIndex }) => {
       const span = endIndex - startIndex + 1;
       const continuesBefore = getEventStart(item) < weekDates[startIndex];
@@ -901,14 +877,10 @@ function renderMonthView(year, month) {
       `;
     }).join("");
 
+    // 課題
     const taskCells = days.map(day => `
-      <div
-        class="month-task-cell"
-        data-date="${day.key}"
-        onclick="openCalendarDay('${day.key}')"
-        role="button"
-        tabindex="0"
-        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openCalendarDay('${day.key}')}">
+      <div class="month-task-cell"
+        onclick="openCalendarDay('${day.key}')">
         ${day.tasks.map(task => `
           <div class="month-task-label">課題：${escapeHTML(task.title)}</div>
         `).join("")}
@@ -1026,14 +998,20 @@ function goToday() {
 function openCalendarDay(date) {
   if (suppressNextEventClick) {
     suppressNextEventClick = false;
+
+    if (suppressClickTimer) {
+      clearTimeout(suppressClickTimer);
+      suppressClickTimer = null;
+    }
+
     return;
   }
 
-  // 日付専用画面へ移動する直前のスクロール位置を保存
   calendarReturnScrollY = window.scrollY;
 
   selectedDate = date;
   calendarDate = parseDate(date);
+
   renderCalendarDay();
 }
 
@@ -1053,7 +1031,7 @@ function returnToCalendar() {
   requestAnimationFrame(() => {
     window.scrollTo({
       top: calendarReturnScrollY,
-      behavior: "instant"
+      behavior: "auto"
     });
   });
 }
@@ -1071,6 +1049,22 @@ function renderCalendarDay() {
   const tasks = appData.tasks.filter(item => item.dueDate === selectedDate);
 
   content.innerHTML = `
+    <button
+      type="button"
+      class="calendar-day-edge-nav prev"
+      onclick="changeSelectedDay(-1)"
+      aria-label="前の日">
+      ‹
+    </button>
+
+    <button
+      type="button"
+      class="calendar-day-edge-nav next"
+      onclick="changeSelectedDay(1)"
+      aria-label="次の日">
+      ›
+    </button>
+
     <div class="card calendar-detail-page">
       <div class="calendar-detail-header">
         <button class="secondary-button" onclick="returnToCalendar()">
@@ -1115,22 +1109,6 @@ function renderCalendarDay() {
         </div>
       ` : ""}
     </div>
-
-    <button
-      type="button"
-      class="calendar-day-arrow calendar-day-arrow-prev"
-      onclick="changeSelectedDay(-1)"
-      aria-label="前の日">
-      ‹
-    </button>
-
-    <button
-      type="button"
-      class="calendar-day-arrow calendar-day-arrow-next"
-      onclick="changeSelectedDay(1)"
-      aria-label="次の日">
-      ›
-    </button>
   `;
 }
 

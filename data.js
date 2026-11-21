@@ -13,7 +13,8 @@ const studyData = {
       5: ["", "", "", "", "", "", ""],
       6: ["", "", "", "", "", "", ""]
     },
-    changes: []
+    changes: [],
+    enabled: true
   }
 };
 
@@ -33,7 +34,8 @@ const StudyStorage = {
           todos: Array.isArray(parsed.todos) ? parsed.todos : [],
           timetable: {
             weekly: { ...weeklyDefaults, ...(savedTimetable.weekly || {}) },
-            changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : []
+            changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : [],
+            enabled: savedTimetable.enabled !== false
           }
         };
       }

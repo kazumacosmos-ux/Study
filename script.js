@@ -640,16 +640,100 @@ function renderHome(content) {
 
   // 提出期限が今日の課題は、完了・未完了に関係なくすべて表示する
   const todayDueTasks = appData.tasks.filter(item => item.dueDate === today);
+  const pendingTodos = appData.todos.filter(item => !item.completed);
+  const timetableEnabled = appData.timetable?.enabled !== false;
+  const todayTimetable = timetableEnabled
+    ? getTimetableForDate(today).filter(item => item.subject && item.subject.trim())
+    : [];
 
-  const todayTimetable = getTimetableForDate(today)
-    .filter(item => item.subject && item.subject.trim());
+  const todayDueCard = todayDueTasks.length ? `
+    <div class="card">
+      <h2 class="card-title">本日提出の課題</h2>
+      <div class="item-list">
+        ${todayDueTasks.map(item => `
+          <div class="list-item">
+            <div>
+              <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
+              <div class="muted">${escapeHTML(item.subject || "未分類")}</div>
+            </div>
+            <span class="tag">${item.status === "completed" ? "完了" : "未完了"}</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  const timetableCard = timetableEnabled ? `
+    <div class="card wide">
+      <h2 class="card-title">本日の時間割</h2>
+      <div class="today-timetable-list">
+        ${todayTimetable.length ? todayTimetable.map(item => `
+          <div class="list-item today-timetable-item">
+            <strong>${item.period}限</strong>
+            ${item.changed ? `<span class="tag today-timetable-changed">変更</span>` : ""}
+            <span class="today-timetable-subject">${escapeHTML(item.subject)}</span>
+          </div>
+        `).join("") : `<p class="muted">本日の授業はありません。</p>`}
+      </div>
+    </div>
+  ` : "";
+
+  const todoCard = pendingTodos.length ? `
+    <div class="card wide">
+      <div class="calendar-toolbar">
+        <h2 class="card-title">TODO</h2>
+        <button class="secondary-button" onclick="showPage('todo')">TODOを管理</button>
+      </div>
+      <div class="todo-list item-list">
+        ${pendingTodos.map(item => `
+          <label class="todo-item">
+            <input type="checkbox" onchange="toggleTodo(${Number(item.id)}, this.checked)">
+            <span>${escapeHTML(item.text)}</span>
+          </label>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  const todayEventsCard = todayEvents.length ? `
+    <div class="card">
+      <h2 class="card-title">今日の予定</h2>
+      <div class="item-list">
+        ${todayEvents.map(item => `
+          <button class="list-item event-list-button" onclick="openCalendarDay('${today}')">
+            <strong>${escapeHTML(item.title)}</strong>
+            <span class="tag">${escapeHTML(item.category || "その他")}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  const upcomingTasksCard = upcomingTasks.length ? `
+    <div class="card">
+      <h2 class="card-title">これからの課題</h2>
+      <div class="item-list">
+        ${upcomingTasks.map(item => `
+          <div class="list-item">
+            <div>
+              <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
+              <div class="muted">期限：${escapeHTML(item.dueDate)}</div>
+            </div>
+            <span class="tag">${escapeHTML(item.subject || "未分類")}</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
 
   content.innerHTML = `
     <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">今日の予定</div>
-        <div class="stat-value">${todayEvents.length}<span class="muted"> 件</span></div>
-      </div>
+      ${todayEvents.length ? `
+        <div class="stat-card">
+          <div class="stat-label">今日の予定</div>
+          <div class="stat-value">${todayEvents.length}<span class="muted"> 件</span></div>
+        </div>
+      ` : ""}
       <div class="stat-card">
         <div class="stat-label">未完了の課題</div>
         <div class="stat-value">${pendingTasks.length}<span class="muted"> 件</span></div>
@@ -657,75 +741,11 @@ function renderHome(content) {
     </div>
 
     <div class="dashboard-grid">
-      <div class="card">
-        <h2 class="card-title">今日の予定</h2>
-        <div class="item-list">
-          ${todayEvents.length ? todayEvents.map(item => `
-            <button class="list-item event-list-button" onclick="openCalendarDay('${today}')">
-              <strong>${escapeHTML(item.title)}</strong>
-              <span class="tag">${escapeHTML(item.category || "その他")}</span>
-            </button>
-          `).join("") : `<p class="muted">今日の予定はありません。</p>`}
-        </div>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title">これからの課題</h2>
-        <div class="item-list">
-          ${upcomingTasks.length ? upcomingTasks.map(item => `
-            <div class="list-item">
-              <div>
-                <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
-                <div class="muted">期限：${escapeHTML(item.dueDate)}</div>
-              </div>
-              <span class="tag">${escapeHTML(item.subject || "未分類")}</span>
-            </div>
-          `).join("") : `<p class="muted">未完了の課題はありません。</p>`}
-        </div>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title">本日提出の課題</h2>
-        <div class="item-list">
-          ${todayDueTasks.length ? todayDueTasks.map(item => `
-            <div class="list-item">
-              <div>
-                <strong>${escapeHTML(item.title || item.range || "課題")}</strong>
-                <div class="muted">${escapeHTML(item.subject || "未分類")}</div>
-              </div>
-              <span class="tag">${item.status === "completed" ? "完了" : "未完了"}</span>
-            </div>
-          `).join("") : `<p class="muted">本日提出の課題はありません。</p>`}
-        </div>
-      </div>
-
-      <div class="card wide">
-        <div class="calendar-toolbar">
-          <h2 class="card-title">TODO</h2>
-          <button class="secondary-button" onclick="showPage('todo')">TODOを管理</button>
-        </div>
-        <div class="todo-list item-list">
-          ${appData.todos.filter(item => !item.completed).length ? appData.todos.filter(item => !item.completed).map(item => `
-            <label class="todo-item">
-              <input type="checkbox" onchange="toggleTodo(${Number(item.id)}, this.checked)">
-              <span>${escapeHTML(item.text)}</span>
-            </label>
-          `).join("") : `<p class="muted">未完了のTODOはありません。</p>`}
-        </div>
-      </div>
-
-      <div class="card wide">
-        <h2 class="card-title">本日の時間割</h2>
-        <div class="today-timetable-list">
-          ${todayTimetable.length ? todayTimetable.map(item => `
-            <div class="list-item today-timetable-item">
-              <strong>${item.period}限</strong>
-              ${item.changed ? `<span class="tag today-timetable-changed">変更</span>` : ""}
-              <span class="today-timetable-subject">${escapeHTML(item.subject)}</span>
-            </div>
-          `).join("") : `<p class="muted">本日の授業はありません。</p>`}
-        </div>
-      </div>
+      ${todayDueCard}
+      ${timetableCard}
+      ${todoCard}
+      ${todayEventsCard}
+      ${upcomingTasksCard}
     </div>
   `;
 }
@@ -1837,6 +1857,9 @@ function ensureTimetableData() {
   if (!Array.isArray(appData.timetable.changes)) {
     appData.timetable.changes = [];
   }
+  if (typeof appData.timetable.enabled !== "boolean") {
+    appData.timetable.enabled = true;
+  }
 
   // 今後の時間割変更に備え、全曜日を7限まで保持する。
   timetableDays.forEach(day => {
@@ -1903,6 +1926,7 @@ function renderTimetable(content) {
   `).join("");
 
   content.innerHTML = `
+    ${appData.timetable.enabled ? `
     <div class="card timetable-card">
       <div class="timetable-week-navigation">
         <button type="button" class="secondary-button timetable-week-button" onclick="shiftTimetableWeek(-1)">‹ <span>前の週</span></button>
@@ -1935,6 +1959,7 @@ function renderTimetable(content) {
         <span><b>／</b> 授業なし</span>
       </div>
     </div>
+    ` : ""}
 
     <div class="card timetable-card">
       <h2 class="card-title">時間割変更</h2>
@@ -1990,7 +2015,23 @@ function renderTimetable(content) {
         <button class="primary-button timetable-settings-save" type="submit">通常時間割を保存</button>
       </form>
     </details>
+
+    <div class="card timetable-toggle-card">
+      <h2 class="card-title">通常時間割の表示</h2>
+      <label class="timetable-toggle-label">
+        <input type="checkbox" ${appData.timetable.enabled ? "checked" : ""} onchange="toggleNormalTimetable(this.checked)">
+        <span>通常時間割を表示する</span>
+      </label>
+      <p class="muted">OFFにすると通常時間割は表示されません。ONに戻すまで、この設定は維持されます。</p>
+    </div>
   `;
+}
+
+function toggleNormalTimetable(enabled) {
+  ensureTimetableData();
+  appData.timetable.enabled = enabled;
+  saveData();
+  renderTimetable(document.getElementById("page-content"));
 }
 
 function shiftTimetableWeek(amount) {

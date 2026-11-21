@@ -1937,3 +1937,19 @@ textarea:focus {
   .todo-add-form { flex-direction: column; }
   .todo-add-form button { width: 100%; }
 }
+
+/* 通常時間割のON/OFF設定 */
+.timetable-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.timetable-toggle-label input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}

@@ -1,4 +1,3 @@
-
 // ======================================
 // Study - 学習管理システム
 // ======================================
@@ -25,6 +24,9 @@ let detailEventId = null;
 let calendarDrag = null;
 let suppressNextEventClick = false;
 let copyToastTimer = null;
+
+// カレンダー復帰時のスクロール位置
+let calendarReturnScrollY = 0;
 
 // --------------------------------------
 // 初期化
@@ -165,7 +167,6 @@ function setupCalendarStyles() {
   style.id = "study-calendar-custom-styles";
 
   style.textContent = `
-    /* カレンダー上の文字選択を防止 */
     .month-calendar,
     .month-calendar * {
       -webkit-user-select: none;
@@ -173,7 +174,6 @@ function setupCalendarStyles() {
       -webkit-touch-callout: none;
     }
 
-    /* ドラッグ操作 */
     .month-event-bar {
       -webkit-user-select: none;
       user-select: none;
@@ -186,8 +186,7 @@ function setupCalendarStyles() {
       opacity: 0.45;
     }
 
-    /* 前後の月の日付 */
-    .month-day.outside-month {
+    .outside-month {
       background-color: #fafafa;
     }
 
@@ -200,7 +199,6 @@ function setupCalendarStyles() {
       opacity: 0.55;
     }
 
-    /* ドラッグ中の表示 */
     .study-drag-ghost {
       position: fixed;
       z-index: 99999;
@@ -223,7 +221,6 @@ function setupCalendarStyles() {
       background-color: #edf4ff;
     }
 
-    /* コピー完了通知 */
     .study-copy-toast {
       position: fixed;
       top: 18px;
@@ -301,7 +298,6 @@ function setupCalendarInteractions() {
     if (event.pointerType === "mouse") {
       startCalendarDrag();
     } else {
-      // タッチ操作では長押ししてからドラッグ開始
       calendarDrag.timer = setTimeout(() => {
         if (calendarDrag) {
           startCalendarDrag();
@@ -320,7 +316,6 @@ function setupCalendarInteractions() {
         event.clientY - calendarDrag.startY
       );
 
-      // 長押しが成立する前に動かした場合は通常操作に戻す
       if (distance > 10 && calendarDrag.timer) {
         clearTimeout(calendarDrag.timer);
         calendarDrag.timer = null;
@@ -352,6 +347,10 @@ function setupCalendarInteractions() {
       if (targetDate) {
         copyEventToDate(calendarDrag.item, targetDate);
         suppressNextEventClick = true;
+
+        setTimeout(() => {
+          suppressNextEventClick = false;
+        }, 400);
       }
 
       finishCalendarDrag();
@@ -433,6 +432,24 @@ function findCalendarDateAtPoint(x, y) {
     }
   }
 
+  // 予定欄・課題欄の空白部分も日付として判定する
+  const targets = document.querySelectorAll(
+    ".month-event-hit-target, .month-task-cell"
+  );
+
+  for (const target of targets) {
+    const rect = target.getBoundingClientRect();
+
+    if (
+      x >= rect.left &&
+      x <= rect.right &&
+      y >= rect.top &&
+      y <= rect.bottom
+    ) {
+      return target.dataset.date || null;
+    }
+  }
+
   return null;
 }
 
@@ -477,7 +494,6 @@ function copyEventToDate(item, targetDate) {
   newEnd.setDate(newEnd.getDate() + duration);
 
   const newEndDate = dateString(newEnd);
-
   const newId = createUniqueEventId();
 
   const copiedEvent = {
@@ -764,7 +780,6 @@ function renderMonthView(year, month) {
       });
     }
 
-    // この週に関係する予定を取得
     const weekEvents = appData.events
       .filter(item =>
         getEventStart(item) <= weekDates[6] &&
@@ -779,12 +794,10 @@ function renderMonthView(year, month) {
         const aMulti = aStart !== aEnd;
         const bMulti = bStart !== bEnd;
 
-        // 複数日予定を優先
         if (aMulti !== bMulti) {
           return aMulti ? -1 : 1;
         }
 
-        // 複数日予定同士は期間が長い順
         const aDuration = parseDate(aEnd) - parseDate(aStart);
         const bDuration = parseDate(bEnd) - parseDate(bStart);
 
@@ -795,7 +808,6 @@ function renderMonthView(year, month) {
         return aStart.localeCompare(bStart);
       });
 
-    // 予定を最大3段に配置
     const lanes = [[], [], []];
     const visibleEvents = [];
 
@@ -839,7 +851,6 @@ function renderMonthView(year, month) {
       });
     });
 
-    // 日付の数字
     const dayCells = days.map(day => {
       const count = day.events.length;
 
@@ -859,7 +870,17 @@ function renderMonthView(year, month) {
       `;
     }).join("");
 
-    // 予定の帯
+    // 予定欄の各日付に透明なクリック領域を設置
+    const eventHitTargets = days.map(day => `
+      <button
+        type="button"
+        class="month-event-hit-target"
+        data-date="${day.key}"
+        aria-label="${day.date.getMonth() + 1}月${day.date.getDate日}日を開く"
+        onclick="openCalendarDay('${day.key}')">
+      </button>
+    `).join("");
+
     const eventBars = visibleEvents.map(({ item, startIndex, endIndex, laneIndex }) => {
       const span = endIndex - startIndex + 1;
       const continuesBefore = getEventStart(item) < weekDates[startIndex];
@@ -880,9 +901,14 @@ function renderMonthView(year, month) {
       `;
     }).join("");
 
-    // 課題
     const taskCells = days.map(day => `
-      <div class="month-task-cell">
+      <div
+        class="month-task-cell"
+        data-date="${day.key}"
+        onclick="openCalendarDay('${day.key}')"
+        role="button"
+        tabindex="0"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openCalendarDay('${day.key}')}">
         ${day.tasks.map(task => `
           <div class="month-task-label">課題：${escapeHTML(task.title)}</div>
         `).join("")}
@@ -896,6 +922,7 @@ function renderMonthView(year, month) {
         </div>
 
         <div class="month-event-grid">
+          ${eventHitTargets}
           ${eventBars}
         </div>
 
@@ -1002,9 +1029,33 @@ function openCalendarDay(date) {
     return;
   }
 
+  // 日付専用画面へ移動する直前のスクロール位置を保存
+  calendarReturnScrollY = window.scrollY;
+
   selectedDate = date;
   calendarDate = parseDate(date);
   renderCalendarDay();
+}
+
+function changeSelectedDay(amount) {
+  const date = parseDate(selectedDate);
+  date.setDate(date.getDate() + amount);
+
+  selectedDate = dateString(date);
+  calendarDate = new Date(date);
+
+  renderCalendarDay();
+}
+
+function returnToCalendar() {
+  showPage("calendar");
+
+  requestAnimationFrame(() => {
+    window.scrollTo({
+      top: calendarReturnScrollY,
+      behavior: "instant"
+    });
+  });
 }
 
 function renderCalendarDay() {
@@ -1022,7 +1073,7 @@ function renderCalendarDay() {
   content.innerHTML = `
     <div class="card calendar-detail-page">
       <div class="calendar-detail-header">
-        <button class="secondary-button" onclick="showPage('calendar')">
+        <button class="secondary-button" onclick="returnToCalendar()">
           ← カレンダーに戻る
         </button>
 
@@ -1064,6 +1115,22 @@ function renderCalendarDay() {
         </div>
       ` : ""}
     </div>
+
+    <button
+      type="button"
+      class="calendar-day-arrow calendar-day-arrow-prev"
+      onclick="changeSelectedDay(-1)"
+      aria-label="前の日">
+      ‹
+    </button>
+
+    <button
+      type="button"
+      class="calendar-day-arrow calendar-day-arrow-next"
+      onclick="changeSelectedDay(1)"
+      aria-label="次の日">
+      ›
+    </button>
   `;
 }
 

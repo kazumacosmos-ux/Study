@@ -2277,8 +2277,35 @@ textarea:focus {
   box-shadow: 0 2px 12px rgba(25, 35, 60, .10);
   border: 1px solid rgba(80, 90, 110, .12);
 }
+/* 1時間ごとの細い目盛り線 */
+.daily-clock::before,
+/* 3時間ごとの少し濃い目盛り線 */
+.daily-clock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.daily-clock::before {
+  z-index: 1;
+  background: repeating-conic-gradient(
+    from -0.35deg,
+    rgba(255, 255, 255, .82) 0deg 0.55deg,
+    transparent 0.55deg 15deg
+  );
+}
+.daily-clock::after {
+  z-index: 1;
+  background: repeating-conic-gradient(
+    from -0.65deg,
+    rgba(45, 55, 75, .48) 0deg 1.15deg,
+    transparent 1.15deg 45deg
+  );
+}
 .daily-clock-hole {
   position: absolute;
+  z-index: 3;
   inset: 30%;
   border-radius: 50%;
   background: var(--surface, #fff);

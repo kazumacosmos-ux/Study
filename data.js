@@ -11,9 +11,11 @@ const studyData = {
       3: ["", "", "", "", "", "", ""],
       4: ["", "", "", "", "", "", ""],
       5: ["", "", "", "", "", "", ""],
-      6: ["", "", "", "", "", "", ""]
+      6: ["", "", "", "", "", "", ""],
+      0: ["", "", "", "", "", "", ""]
     },
     changes: [],
+    specialDays: [],
     enabled: true
   }
 };
@@ -35,6 +37,7 @@ const StudyStorage = {
           timetable: {
             weekly: { ...weeklyDefaults, ...(savedTimetable.weekly || {}) },
             changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : [],
+            specialDays: Array.isArray(savedTimetable.specialDays) ? savedTimetable.specialDays : [],
             enabled: savedTimetable.enabled !== false
           }
         };

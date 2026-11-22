@@ -2002,3 +2002,29 @@ textarea:focus {
   .auth-card { padding: 23px; }
   .topbar-actions { align-items: flex-end; flex-direction: column; gap: 7px; }
 }
+
+/* 特殊時間割 */
+.special-timetable-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.month-day-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.month-day-holiday-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c34b4b;
+  font-size: 10px;
+  font-weight: 700;
+}
+@media (min-width: 700px) {
+  .special-timetable-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

@@ -315,6 +315,44 @@ function isJapaneseHoliday(date) {
   return getJapaneseHolidays(date.getFullYear()).has(dateString(date));
 }
 
+function getJapaneseHolidayName(date) {
+  const y = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const key = dateString(date);
+  const nthMonday = (m, nth) => {
+    const first = new Date(y, m - 1, 1).getDay();
+    return 1 + (8 - first) % 7 + (nth - 1) * 7;
+  };
+  const vernal = Math.floor(20.8431 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+  const autumn = Math.floor(23.2488 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4));
+
+  if (month === 1 && day === 1) return "元日";
+  if (month === 1 && day === (y >= 2000 ? nthMonday(1, 2) : 15)) return "成人の日";
+  if (month === 2 && day === 11) return "建国記念の日";
+  if (month === 2 && y >= 2020 && day === 23) return "天皇誕生日";
+  if (month === 3 && day === vernal) return "春分の日";
+  if (month === 4 && day === 29) return "昭和の日";
+  if (month === 5 && day === 3) return "憲法記念日";
+  if (month === 5 && day === 4) return "みどりの日";
+  if (month === 5 && day === 5) return "こどもの日";
+  if (month === 7 && day === (y === 2020 ? 23 : y === 2021 ? 22 : y >= 2003 ? nthMonday(7, 3) : 20)) return "海の日";
+  if (month === 8 && day === (y === 2020 ? 10 : y === 2021 ? 8 : y >= 2016 ? 11 : -1)) return "山の日";
+  if (month === 9 && day === (y >= 2003 ? nthMonday(9, 3) : 15)) return "敬老の日";
+  if (month === 9 && day === autumn) return "秋分の日";
+  if (month === 10 && day === (y === 2020 ? 24 : y === 2021 ? 23 : y >= 2000 ? nthMonday(10, 2) : 10)) return "スポーツの日";
+  if (month === 11 && day === 3) return "文化の日";
+  if (month === 11 && day === 23) return "勤労感謝の日";
+
+  if (!isJapaneseHoliday(date)) return "";
+  const previous = new Date(date);
+  previous.setDate(previous.getDate() - 1);
+  const next = new Date(date);
+  next.setDate(next.getDate() + 1);
+  if (isJapaneseHoliday(previous) && isJapaneseHoliday(next)) return "国民の休日";
+  return "振替休日";
+}
+
 function isClosureEvent(item) {
   return item.category === "休校・休み";
 }
@@ -1134,6 +1172,10 @@ function renderMonthView(year, month) {
     const dayCells = days.map(day => {
       const count = day.events.filter(item => !isClosureEvent(item)).length;
       const dayOff = isDayOff(day.date, appData.events);
+      const closureTitles = day.events.filter(isClosureEvent).map(item=>item.title).filter(Boolean);
+      const dayLabel = isJapaneseHoliday(day.date)
+        ? getJapaneseHolidayName(day.date)
+        : (day.date.getDay() === 0 ? "" : (closureTitles[0] || ""));
 
       return `
         <div class="month-day ${day.key === today ? "today" : ""} ${day.outside ? "outside-month" : ""} ${dayOff ? "day-off" : ""}"
@@ -1145,6 +1187,7 @@ function renderMonthView(year, month) {
 
           <div class="month-day-heading">
             <span class="month-day-number">${day.date.getDate()}</span>
+            ${dayLabel ? `<span class="month-day-holiday-title">${escapeHTML(dayLabel)}</span>` : ""}
             ${count > 3 ? `<span class="month-overflow">4つ以上</span>` : ""}
           </div>
         </div>
@@ -1399,7 +1442,7 @@ function renderCalendarDay() {
         ${events.length ? events.map(item => `
           <button class="event-detail-row" onclick="openEventDetail(${item.id})">
             <span class="event-color-mark ${getCategoryStyle(item.category)}"></span>
-            <span class="event-detail-title">${isClosureEvent(item) ? "休み" : escapeHTML(item.title)}</span>
+            <span class="event-detail-title">${escapeHTML(item.title || "休み")}</span>
             <span class="muted">›</span>
           </button>
         `).join("") : `<p class="muted">この日の予定はありません。</p>`}
@@ -1625,7 +1668,7 @@ function saveEventForm(event) {
 
   const isClosure = category === "休校・休み";
 
-  if ((!title && !isClosure) || !startDate || !endDate || !category) {
+  if (!title || !startDate || !endDate || !category) {
     alert("予定名・開始日・終了日・カテゴリーを入力してください。");
     return;
   }
@@ -2001,7 +2044,8 @@ const timetableDays = [
   { number: 3, name: "水" },
   { number: 4, name: "木" },
   { number: 5, name: "金" },
-  { number: 6, name: "土" }
+  { number: 6, name: "土" },
+  { number: 0, name: "日" }
 ];
 
 function getMonday(date) {
@@ -2024,6 +2068,9 @@ function ensureTimetableData() {
   }
   if (!Array.isArray(appData.timetable.changes)) {
     appData.timetable.changes = [];
+  }
+  if (!Array.isArray(appData.timetable.specialDays)) {
+    appData.timetable.specialDays = [];
   }
   if (typeof appData.timetable.enabled !== "boolean") {
     appData.timetable.enabled = true;
@@ -2055,7 +2102,7 @@ function renderTimetable(content) {
     return { ...day, date, key: dateString(date) };
   });
 
-  const weekEnd = weekDates[5].date;
+  const weekEnd = weekDates[6].date;
   const rangeLabel = `${timetableWeekStart.getFullYear()}年${timetableWeekStart.getMonth() + 1}月${timetableWeekStart.getDate()}日 〜 ${weekEnd.getMonth() + 1}月${weekEnd.getDate()}日`;
 
   const weeklyRows = Array.from({ length: 7 }, (_, periodIndex) => `
@@ -2130,6 +2177,41 @@ function renderTimetable(content) {
     ` : ""}
 
     <div class="card timetable-card">
+      <h2 class="card-title">特殊時間割</h2>
+      <p class="muted">指定した日付の時間割を、通常時間割の代わりに1〜7限までまとめて登録できます。授業がないコマは空欄にしてください。</p>
+      <form class="special-timetable-form" onsubmit="saveSpecialTimetable(event)">
+        <div class="form-field">
+          <label for="special-timetable-date">日付</label>
+          <input id="special-timetable-date" type="date" value="${todayString()}" required>
+        </div>
+        <div class="special-timetable-grid">
+          ${Array.from({length:7},(_,i)=>`
+            <div class="form-field">
+              <label for="special-period-${i+1}">${i+1}限</label>
+              <input id="special-period-${i+1}" type="text" maxlength="30" placeholder="授業なしは空欄">
+            </div>
+          `).join("")}
+        </div>
+        <button class="primary-button" type="submit">特殊時間割を保存</button>
+      </form>
+      <div class="timetable-change-list">
+        <h3 class="timetable-subtitle">登録済みの特殊時間割</h3>
+        ${appData.timetable.specialDays.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(item=>`
+          <div class="timetable-change-row">
+            <div>
+              <strong>${escapeHTML(item.date)}（${["日","月","火","水","木","金","土"][parseDate(item.date).getDay()]}）</strong>
+              <div class="muted">${(item.periods || []).map((subject,index)=>`${index+1}限 ${subject ? escapeHTML(subject) : "／"}`).join(" ・ ")}</div>
+            </div>
+            <div class="timetable-change-actions">
+              <button class="secondary-button" type="button" onclick="editSpecialTimetable('${item.date}')">編集</button>
+              <button class="secondary-button" type="button" onclick="deleteSpecialTimetable('${item.date}')">削除</button>
+            </div>
+          </div>
+        `).join("") || `<p class="muted">特殊時間割は登録されていません。</p>`}
+      </div>
+    </div>
+
+    <div class="card timetable-card">
       <h2 class="card-title">時間割変更</h2>
       <p class="muted">日付と時限を選び、その日だけの授業を変更できます。変更したコマには上の表で枠線が付きます。</p>
 
@@ -2185,17 +2267,50 @@ function renderTimetable(content) {
     </details>
 
     <div class="card timetable-toggle-card">
-      <h2 class="card-title">通常時間割の表示</h2>
+      <h2 class="card-title">時間割の表示</h2>
       <label class="timetable-toggle-label">
-        <input type="checkbox" ${appData.timetable.enabled ? "checked" : ""} onchange="toggleNormalTimetable(this.checked)">
-        <span>通常時間割を表示する</span>
+        <input type="checkbox" ${appData.timetable.enabled ? "checked" : ""} onchange="toggleTimetable(this.checked)">
+        <span>時間割を表示する</span>
       </label>
-      <p class="muted">OFFにすると通常時間割は表示されません。ONに戻すまで、この設定は維持されます。</p>
+      <p class="muted">OFFにすると通常時間割・特殊時間割の両方が非表示になります。ONに戻すまで、この設定は維持されます。</p>
     </div>
   `;
 }
 
-function toggleNormalTimetable(enabled) {
+function saveSpecialTimetable(event) {
+  event.preventDefault();
+  ensureTimetableData();
+  const date = document.getElementById("special-timetable-date").value;
+  if (!date) return;
+  const periods = Array.from({length:7},(_,index)=>
+    document.getElementById(`special-period-${index+1}`).value.trim()
+  );
+  const existing = appData.timetable.specialDays.find(item=>item.date===date);
+  if (existing) existing.periods = periods;
+  else appData.timetable.specialDays.push({ id: Date.now(), date, periods });
+  saveData();
+  renderTimetable(document.getElementById("page-content"));
+}
+
+function editSpecialTimetable(date) {
+  const item = appData.timetable.specialDays.find(entry=>entry.date===date);
+  if (!item) return;
+  document.getElementById("special-timetable-date").value = item.date;
+  (item.periods || []).forEach((subject,index)=>{
+    const field=document.getElementById(`special-period-${index+1}`);
+    if(field) field.value=subject || "";
+  });
+  document.getElementById("special-timetable-date").scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+function deleteSpecialTimetable(date) {
+  if (!confirm(`${date}の特殊時間割を削除しますか？`)) return;
+  appData.timetable.specialDays=appData.timetable.specialDays.filter(item=>item.date!==date);
+  saveData();
+  renderTimetable(document.getElementById("page-content"));
+}
+
+function toggleTimetable(enabled) {
   ensureTimetableData();
   appData.timetable.enabled = enabled;
   saveData();
@@ -2251,11 +2366,6 @@ function saveTimetableChange(event) {
 
   if (!date) return;
 
-  const dayNumber = parseDate(date).getDay();
-  if (dayNumber === 0) {
-    alert("日曜日は時間割の対象外です。");
-    return;
-  }
   if (period < 1 || period > 7) return;
 
   const existing = appData.timetable.changes.find(
@@ -2299,18 +2409,22 @@ function deleteTimetableChange(id) {
 function getTimetableForDate(date) {
   ensureTimetableData();
   const dayNumber = parseDate(date).getDay();
-  if (dayNumber === 0) return [];
-
-  const periods = appData.timetable.weekly[dayNumber] || [];
+  const special = appData.timetable.specialDays.find(item => item.date === date);
+  const periods = special
+    ? (Array.isArray(special.periods) ? special.periods : [])
+    : (appData.timetable.weekly[dayNumber] || []);
 
   return Array.from({ length: 7 }, (_, index) => {
-    const change = appData.timetable.changes.find(
+    const change = special ? null : appData.timetable.changes.find(
       item => item.date === date && Number(item.period) === index + 1
     );
     return {
       period: index + 1,
-      subject: change ? (change.subject || "") : (periods[index] || ""),
-      changed: Boolean(change)
+      subject: special
+        ? (periods[index] || "")
+        : (change ? (change.subject || "") : (periods[index] || "")),
+      changed: Boolean(special || change),
+      special: Boolean(special)
     };
   });
 }

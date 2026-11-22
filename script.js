@@ -2141,6 +2141,45 @@ function renderTimetable(content) {
   `).join("");
 
   content.innerHTML = `
+    <div class="card timetable-card">
+      <h2 class="card-title">時間割変更</h2>
+      <p class="muted">日付と時限を選び、その日だけの授業を変更できます。変更したコマには上の表で枠線が付きます。</p>
+
+      <form class="timetable-change-form" onsubmit="saveTimetableChange(event)">
+        <div class="form-field">
+          <label for="timetable-change-date">変更する日付</label>
+          <input id="timetable-change-date" type="date" value="${todayString()}" onchange="updateTimetablePeriodOptions(this.value)" required>
+        </div>
+        <div class="form-field">
+          <label for="timetable-change-period">何時間目</label>
+          <select id="timetable-change-period" required>
+            ${Array.from({length:7},(_,i)=>`<option value="${i+1}">${i+1}限</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="timetable-change-subject">変更後の教科</label>
+          <input id="timetable-change-subject" type="text" maxlength="30" placeholder="例：英語（授業なしは空欄）">
+        </div>
+        <button class="primary-button" type="submit">変更を保存</button>
+      </form>
+
+      <div class="timetable-change-list">
+        <h3 class="timetable-subtitle">登録済みの変更</h3>
+        ${changes.length ? changes.map(change => `
+          <div class="timetable-change-row">
+            <div>
+              <strong>${escapeHTML(change.date)}・${change.period}限</strong>
+              <div class="muted">${change.subject ? escapeHTML(change.subject) : "／（授業なし）"}</div>
+            </div>
+            <div class="timetable-change-actions">
+              <button class="secondary-button" type="button" onclick="editTimetableChange(${change.id})">編集</button>
+              <button class="secondary-button" type="button" onclick="deleteTimetableChange(${change.id})">削除</button>
+            </div>
+          </div>
+        `).join("") : `<p class="muted">時間割変更は登録されていません。</p>`}
+      </div>
+    </div>
+
     ${appData.timetable.enabled ? `
     <div class="card timetable-card">
       <div class="timetable-week-navigation">
@@ -2211,46 +2250,14 @@ function renderTimetable(content) {
       </div>
     </div>
 
-    <div class="card timetable-card">
-      <h2 class="card-title">時間割変更</h2>
-      <p class="muted">日付と時限を選び、その日だけの授業を変更できます。変更したコマには上の表で枠線が付きます。</p>
-
-      <form class="timetable-change-form" onsubmit="saveTimetableChange(event)">
-        <div class="form-field">
-          <label for="timetable-change-date">変更する日付</label>
-          <input id="timetable-change-date" type="date" value="${todayString()}" onchange="updateTimetablePeriodOptions(this.value)" required>
-        </div>
-        <div class="form-field">
-          <label for="timetable-change-period">何時間目</label>
-          <select id="timetable-change-period" required>
-            ${Array.from({length:7},(_,i)=>`<option value="${i+1}">${i+1}限</option>`).join("")}
-          </select>
-        </div>
-        <div class="form-field">
-          <label for="timetable-change-subject">変更後の教科</label>
-          <input id="timetable-change-subject" type="text" maxlength="30" placeholder="例：英語（授業なしは空欄）">
-        </div>
-        <button class="primary-button" type="submit">変更を保存</button>
-      </form>
-
-      <div class="timetable-change-list">
-        <h3 class="timetable-subtitle">登録済みの変更</h3>
-        ${changes.length ? changes.map(change => `
-          <div class="timetable-change-row">
-            <div>
-              <strong>${escapeHTML(change.date)}・${change.period}限</strong>
-              <div class="muted">${change.subject ? escapeHTML(change.subject) : "／（授業なし）"}</div>
-            </div>
-            <div class="timetable-change-actions">
-              <button class="secondary-button" type="button" onclick="editTimetableChange(${change.id})">編集</button>
-              <button class="secondary-button" type="button" onclick="deleteTimetableChange(${change.id})">削除</button>
-            </div>
-          </div>
-        `).join("") : `<p class="muted">時間割変更は登録されていません。</p>`}
-      </div>
-    </div>
-
-    <details class="card timetable-card timetable-settings-card">
+    <div class="card timetable-toggle-card">
+      <h2 class="card-title">時間割の表示</h2>
+      <label class="timetable-toggle-label">
+        <input type="checkbox" ${appData.timetable.enabled ? "checked" : ""} onchange="toggleTimetable(this.checked)">
+        <span>時間割を表示する</span>
+      </label>
+      <p class="muted">OFFにすると通常時間割・特殊時間割の両方が非表示になります。ONに戻すまで、この設定は維持されます。</p>
+    </div>    <details class="card timetable-card timetable-settings-card">
       <summary>通常時間割を設定</summary>
       <p class="muted">ここで設定した内容が、上の時間割表の基本になります。上の表自体は編集できません。</p>
       <form onsubmit="saveWeeklyTimetable(event)">
@@ -2265,15 +2272,6 @@ function renderTimetable(content) {
         <button class="primary-button timetable-settings-save" type="submit">通常時間割を保存</button>
       </form>
     </details>
-
-    <div class="card timetable-toggle-card">
-      <h2 class="card-title">時間割の表示</h2>
-      <label class="timetable-toggle-label">
-        <input type="checkbox" ${appData.timetable.enabled ? "checked" : ""} onchange="toggleTimetable(this.checked)">
-        <span>時間割を表示する</span>
-      </label>
-      <p class="muted">OFFにすると通常時間割・特殊時間割の両方が非表示になります。ONに戻すまで、この設定は維持されます。</p>
-    </div>
   `;
 }
 

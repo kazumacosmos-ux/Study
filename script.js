@@ -2163,21 +2163,6 @@ function renderTimetable(content) {
         <button class="primary-button" type="submit">変更を保存</button>
       </form>
 
-      <div class="timetable-change-list">
-        <h3 class="timetable-subtitle">登録済みの変更</h3>
-        ${changes.length ? changes.map(change => `
-          <div class="timetable-change-row">
-            <div>
-              <strong>${escapeHTML(change.date)}・${change.period}限</strong>
-              <div class="muted">${change.subject ? escapeHTML(change.subject) : "／（授業なし）"}</div>
-            </div>
-            <div class="timetable-change-actions">
-              <button class="secondary-button" type="button" onclick="editTimetableChange(${change.id})">編集</button>
-              <button class="secondary-button" type="button" onclick="deleteTimetableChange(${change.id})">削除</button>
-            </div>
-          </div>
-        `).join("") : `<p class="muted">時間割変更は登録されていません。</p>`}
-      </div>
     </div>
 
     ${appData.timetable.enabled ? `
@@ -2233,21 +2218,6 @@ function renderTimetable(content) {
         </div>
         <button class="primary-button" type="submit">特殊時間割を保存</button>
       </form>
-      <div class="timetable-change-list">
-        <h3 class="timetable-subtitle">登録済みの特殊時間割</h3>
-        ${appData.timetable.specialDays.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(item=>`
-          <div class="timetable-change-row">
-            <div>
-              <strong>${escapeHTML(item.date)}（${["日","月","火","水","木","金","土"][parseDate(item.date).getDay()]}）</strong>
-              <div class="muted">${(item.periods || []).map((subject,index)=>`${index+1}限 ${subject ? escapeHTML(subject) : "／"}`).join(" ・ ")}</div>
-            </div>
-            <div class="timetable-change-actions">
-              <button class="secondary-button" type="button" onclick="editSpecialTimetable('${item.date}')">編集</button>
-              <button class="secondary-button" type="button" onclick="deleteSpecialTimetable('${item.date}')">削除</button>
-            </div>
-          </div>
-        `).join("") || `<p class="muted">特殊時間割は登録されていません。</p>`}
-      </div>
     </div>
 
     <div class="card timetable-toggle-card">
@@ -2272,6 +2242,42 @@ function renderTimetable(content) {
         <button class="primary-button timetable-settings-save" type="submit">通常時間割を保存</button>
       </form>
     </details>
+
+    <div class="card timetable-card">
+      <h2 class="card-title">登録済みの変更</h2>
+      <div class="timetable-change-list">
+        ${changes.length ? changes.map(change => `
+          <div class="timetable-change-row">
+            <div>
+              <strong>${escapeHTML(change.date)}・${change.period}限</strong>
+              <div class="muted">${change.subject ? escapeHTML(change.subject) : "／（授業なし）"}</div>
+            </div>
+            <div class="timetable-change-actions">
+              <button class="secondary-button" type="button" onclick="editTimetableChange(${change.id})">編集</button>
+              <button class="secondary-button" type="button" onclick="deleteTimetableChange(${change.id})">削除</button>
+            </div>
+          </div>
+        `).join("") : `<p class="muted">時間割変更は登録されていません。</p>`}
+      </div>
+    </div>
+
+    <div class="card timetable-card">
+      <h2 class="card-title">登録済みの特殊時間割</h2>
+      <div class="timetable-change-list">
+        ${appData.timetable.specialDays.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(item=>`
+          <div class="timetable-change-row">
+            <div>
+              <strong>${escapeHTML(item.date)}（${["日","月","火","水","木","金","土"][parseDate(item.date).getDay()]}）</strong>
+              <div class="muted">${(item.periods || []).map((subject,index)=>`${index+1}限 ${subject ? escapeHTML(subject) : "／"}`).join(" ・ ")}</div>
+            </div>
+            <div class="timetable-change-actions">
+              <button class="secondary-button" type="button" onclick="editSpecialTimetable('${item.date}')">編集</button>
+              <button class="secondary-button" type="button" onclick="deleteSpecialTimetable('${item.date}')">削除</button>
+            </div>
+          </div>
+        `).join("") || `<p class="muted">特殊時間割は登録されていません。</p>`}
+      </div>
+    </div>
   `;
 
   // iOS Safariでも確実に送信処理が動くよう、描画後にsubmitイベントを直接登録する。

@@ -2218,7 +2218,7 @@ function renderTimetable(content) {
     <div class="card timetable-card">
       <h2 class="card-title">特殊時間割</h2>
       <p class="muted">指定した日付の時間割を、通常時間割の代わりに1〜7限までまとめて登録できます。授業がないコマは空欄にしてください。</p>
-      <form class="special-timetable-form" onsubmit="saveSpecialTimetable(event)">
+      <form class="special-timetable-form" id="special-timetable-form">
         <div class="form-field">
           <label for="special-timetable-date">日付</label>
           <input id="special-timetable-date" type="date" value="${todayString()}" required>
@@ -2273,6 +2273,12 @@ function renderTimetable(content) {
       </form>
     </details>
   `;
+
+  // iOS Safariでも確実に送信処理が動くよう、描画後にsubmitイベントを直接登録する。
+  const specialTimetableForm = content.querySelector("#special-timetable-form");
+  if (specialTimetableForm) {
+    specialTimetableForm.addEventListener("submit", saveSpecialTimetable);
+  }
 }
 
 function saveSpecialTimetable(event) {

@@ -2265,10 +2265,13 @@ textarea:focus {
 .daily-clock-section { display: grid; gap: 10px; }
 .daily-clock-section > .card-title { margin-bottom: 0; }
 .daily-clock-wrap { width: 100%; display: flex; justify-content: center; padding: 12px 0 6px; }
+.daily-clock-stage { position: relative; width: min(100%, 370px); aspect-ratio: 1; flex: 0 1 370px; }
 .daily-clock {
-  position: relative;
-  width: min(78vw, 330px);
-  aspect-ratio: 1;
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  left: 10%;
+  top: 10%;
   border-radius: 50%;
   cursor: crosshair;
   touch-action: manipulation;
@@ -2291,16 +2294,16 @@ textarea:focus {
   z-index: 1;
   background: repeating-conic-gradient(
     from -0.35deg,
-    rgba(255, 255, 255, .82) 0deg 0.55deg,
-    transparent 0.55deg 15deg
+    rgba(255, 255, 255, .72) 0deg 0.28deg,
+    transparent 0.28deg 15deg
   );
 }
 .daily-clock::after {
   z-index: 1;
   background: repeating-conic-gradient(
     from -0.65deg,
-    rgba(45, 55, 75, .48) 0deg 1.15deg,
-    transparent 1.15deg 45deg
+    rgba(45, 55, 75, .42) 0deg 0.62deg,
+    transparent 0.62deg 45deg
   );
 }
 .daily-clock-hole {
@@ -2322,16 +2325,15 @@ textarea:focus {
   position: absolute;
   z-index: 2;
   color: #30394c;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: 11px;
+  font-weight: 700;
   line-height: 1;
+  width: 18px;
+  text-align: center;
   pointer-events: none;
-  text-shadow: 0 1px 2px rgba(255,255,255,.85);
+  transform: translate(-50%, -50%);
+  text-shadow: 0 1px 2px rgba(255,255,255,.9);
 }
-.daily-clock-12 { top: 5%; left: 50%; transform: translateX(-50%); }
-.daily-clock-3 { top: 50%; right: 5%; transform: translateY(-50%); }
-.daily-clock-6 { bottom: 5%; left: 50%; transform: translateX(-50%); }
-.daily-clock-9 { top: 50%; left: 5%; transform: translateY(-50%); }
 .daily-pie-legend { display: grid; gap: 9px; padding: 4px 0; }
 .daily-pie-legend-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto 48px; align-items: center; gap: 8px; font-size: 12px; }
 .daily-pie-dot { width: 10px; height: 10px; border-radius: 3px; }
@@ -2369,7 +2371,6 @@ textarea:focus {
 .daily-record-main { padding-bottom: 18px; }
 .daily-empty-message { padding: 8px 0; }
 @media (max-width: 600px) {
-  .daily-clock { width: min(82vw, 310px); }
   .daily-template-row { grid-template-columns: minmax(0, 1fr) auto auto; }
   .daily-template-row small { display: none; }
   .daily-template-entry-row { grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 5px; }
@@ -2386,6 +2387,8 @@ textarea:focus {
   margin-bottom: 14px;
 }
 .daily-date-toolbar .card-title { margin: 0; }
+.daily-date-actions { display: flex; align-items: center; gap: 8px; }
+.daily-today-button { white-space: nowrap; min-height: 40px; }
 .daily-date-toolbar input[type="date"] { width: auto; max-width: 190px; }
 .daily-entry-editor-slot { display: grid; gap: 10px; }
 .daily-note-section { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft, #fafbfe); }
@@ -2404,23 +2407,31 @@ textarea:focus {
 .daily-history-page { padding: 8px 0; }
 .daily-history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 .daily-history-chart-button {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(170px, 34%) minmax(0, 1fr);
   align-items: center;
+  gap: 18px;
+  width: 100%;
   min-width: 0;
-  padding: 8px;
+  padding: 12px 16px;
+  text-align: left;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface, #fff);
   cursor: pointer;
 }
 .daily-history-chart-button:active { background: var(--surface-soft, #f7f8fb); }
+.daily-history-chart { min-width: 0; }
 .daily-history-chart-button .daily-clock-wrap { padding: 0; width: 100%; }
-.daily-history-chart-button .daily-clock { width: min(100%, 220px); cursor: pointer; }
+.daily-history-chart-button .daily-clock-stage { width: min(100%, 250px); }
+.daily-history-chart-button .daily-clock { cursor: pointer; }
+.daily-history-note { display: grid; gap: 8px; min-width: 0; align-content: center; color: var(--text); }
+.daily-history-note strong { font-size: 13px; }
+.daily-history-note > span { font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 .daily-history-empty { grid-column: 1 / -1; padding: 24px 8px; text-align: center; }
 .daily-record-card > .daily-tag-manager,
 .daily-record-card > .daily-template-manager { margin-top: 14px; }
@@ -2429,9 +2440,11 @@ textarea:focus {
 .daily-template-manager > .daily-section-heading .card-title { margin: 0; }
 @media (max-width: 600px) {
   .daily-date-toolbar { align-items: stretch; flex-direction: column; }
-  .daily-date-toolbar input[type="date"] { width: 100%; max-width: none; }
-  .daily-history-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .daily-history-chart-button { padding: 5px; }
-  .daily-history-chart-button .daily-clock { width: 100%; }
+  .daily-date-actions { width: 100%; }
+  .daily-date-toolbar input[type="date"] { width: 100%; max-width: none; min-width: 0; }
+  .daily-today-button { flex: 0 0 auto; }
+  .daily-history-grid { grid-template-columns: 1fr; gap: 8px; }
+  .daily-history-chart-button { grid-template-columns: minmax(120px, 42%) minmax(0, 1fr); gap: 10px; padding: 8px; }
+  .daily-history-chart-button .daily-clock-stage { width: 100%; }
   .daily-note-section button { width: 100%; }
 }

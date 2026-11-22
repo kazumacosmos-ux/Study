@@ -2608,9 +2608,7 @@ function dailyRenderClock(entries, date = dailyRecordDate, extraClass = "") {
   const stops = [];
   let cursor = 0;
   segments.forEach(segment => {
-    if (segment.start > cursor) {
-      stops.push(`#dfe3ea ${(cursor / 1440 * 360).toFixed(2)}deg ${(segment.start / 1440 * 360).toFixed(2)}deg`);
-    }
+    if (segment.start > cursor) stops.push(`#dfe3ea ${(cursor / 1440 * 360).toFixed(2)}deg ${(segment.start / 1440 * 360).toFixed(2)}deg`);
     const start = Math.max(cursor, segment.start);
     const end = Math.max(start, segment.end);
     if (end > start) {
@@ -2623,14 +2621,19 @@ function dailyRenderClock(entries, date = dailyRecordDate, extraClass = "") {
   const parsed = parseDate(date);
   const centerDate = `${parsed.getMonth() + 1}月${parsed.getDate()}日`;
   const weekday = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"][parsed.getDay()];
+  const labels = Array.from({ length: 24 }, (_, hour) => {
+    const angle = hour / 24 * Math.PI * 2 - Math.PI / 2;
+    const left = 50 + Math.cos(angle) * 46;
+    const top = 50 + Math.sin(angle) * 46;
+    return `<span class="daily-clock-label" style="left:${left.toFixed(3)}%;top:${top.toFixed(3)}%">${hour}</span>`;
+  }).join("");
   return `
     <div class="daily-clock-wrap ${extraClass}">
-      <div class="daily-clock" role="img" aria-label="${escapeHTML(formatDate(parsed))}の24時間タイムチャート。空白部分をタップすると予定を追加、色の付いた部分をタップすると編集できます。" style="background:${gradient}">
-        <div class="daily-clock-hole"><strong>${centerDate}</strong><small>${weekday}</small></div>
-        <span class="daily-clock-label daily-clock-12">0</span>
-        <span class="daily-clock-label daily-clock-3">6</span>
-        <span class="daily-clock-label daily-clock-6">12</span>
-        <span class="daily-clock-label daily-clock-9">18</span>
+      <div class="daily-clock-stage">
+        <div class="daily-clock" role="img" aria-label="${escapeHTML(formatDate(parsed))}の24時間タイムチャート。空白部分をタップすると予定を追加、色の付いた部分をタップすると編集できます。" style="background:${gradient}">
+          <div class="daily-clock-hole"><strong>${centerDate}</strong><small>${weekday}</small></div>
+        </div>
+        ${labels}
       </div>
     </div>`;
 }
@@ -2651,14 +2654,14 @@ function dailyTagOptions(selectedId, fallbackEntry = null) {
 function dailyRenderEntryForm(mode, entry = null, startValue = "08:00") {
   const isEdit = mode === "edit";
   const start = entry ? dailyMinutesToTime(entry.start) : startValue;
-  const end = entry ? dailyMinutesToTime(entry.end) : dailyMinutesToTime((dailyTimeToMinutes(startValue) + 60) % 1440);
+  const end = dailyEntryFormState?.end || (entry ? dailyMinutesToTime(entry.end) : dailyMinutesToTime((dailyTimeToMinutes(startValue) + 60) % 1440));
   const selectedTag = entry ? entry.tagId : (appData.dailyTags[0]?.id || "");
   return `<form id="daily-entry-form" class="daily-entry-form" data-mode="${mode}" data-entry-id="${escapeHTML(entry?.id || "")}">
     <div class="daily-entry-form-heading"><strong>${isEdit ? "予定を編集" : "予定を追加"}</strong><button type="button" class="icon-text-button" data-action="close-entry-form">閉じる</button></div>
     <div class="daily-entry-time-fields">
-      <label>開始時刻<input id="daily-entry-start" type="text" inputmode="text" maxlength="5" placeholder="16:00" value="${escapeHTML(start)}" required></label>
+      <label>開始時刻<input id="daily-entry-start" type="time" step="300" value="${escapeHTML(start === "24:00" ? "00:00" : start)}" required></label>
       <span>〜</span>
-      <label>終了時刻<input id="daily-entry-end" type="text" inputmode="text" maxlength="5" placeholder="18:00 / 24:00" value="${escapeHTML(end)}" required></label>
+      <label>終了時刻<input id="daily-entry-end" type="time" step="300" value="${escapeHTML(end === "24:00" ? "00:00" : end)}" required></label>
     </div>
     <label class="daily-entry-tag-label">タグ<select id="daily-entry-tag" required>${dailyTagOptions(selectedTag, entry)}</select></label>
     <div class="daily-entry-form-actions"><button type="submit" class="primary-button" ${appData.dailyTags.length ? "" : "disabled"}>${isEdit ? "変更を保存" : "予定を登録"}</button>${isEdit ? `<button type="button" class="danger-button" data-action="delete-current-entry">削除</button>` : ""}</div>
@@ -2679,7 +2682,7 @@ function dailyRenderTemplateEditor() {
     <button type="button" class="secondary-button" data-action="add-template-entry">＋ 予定を追加</button>
     ${dailyTemplateEntryFormOpen ? `<form id="daily-template-entry-form" class="daily-entry-form" data-entry-id="${escapeHTML(editEntry?.id || "")}">
       <strong>${editEntry ? "テンプレートの予定を編集" : "テンプレートに予定を追加"}</strong>
-      <div class="daily-entry-time-fields"><label>開始時刻<input id="daily-template-entry-start" type="text" inputmode="text" maxlength="5" placeholder="16:00" value="${editEntry ? dailyMinutesToTime(editEntry.start) : "08:00"}" required></label><span>〜</span><label>終了時刻<input id="daily-template-entry-end" type="text" inputmode="text" maxlength="5" placeholder="18:00 / 24:00" value="${editEntry ? dailyMinutesToTime(editEntry.end) : "09:00"}" required></label></div>
+      <div class="daily-entry-time-fields"><label>開始時刻<input id="daily-template-entry-start" type="time" step="300" value="${editEntry ? dailyMinutesToTime(editEntry.start) : "08:00"}" required></label><span>〜</span><label>終了時刻<input id="daily-template-entry-end" type="time" step="300" value="${editEntry ? (dailyMinutesToTime(editEntry.end) === "24:00" ? "00:00" : dailyMinutesToTime(editEntry.end)) : "09:00"}" required></label></div>
       <label class="daily-entry-tag-label">タグ<select id="daily-template-entry-tag" required>${dailyTagOptions(editEntry?.tagId || appData.dailyTags[0]?.id || "", editEntry)}</select></label>
       <div class="daily-entry-form-actions"><button type="submit" class="primary-button" ${appData.dailyTags.length ? "" : "disabled"}>${editEntry ? "変更を保存" : "追加"}</button><button type="button" class="secondary-button" data-action="cancel-template-entry">キャンセル</button></div>
     </form>` : ""}
@@ -2801,9 +2804,10 @@ function dailyBindSettingsEvents(content) {
     event.preventDefault();
     if (!dailyTemplateDraft) return;
     const start = dailyTimeToMinutes(document.getElementById("daily-template-entry-start").value);
-    const end = dailyTimeToMinutes(document.getElementById("daily-template-entry-end").value, true);
+    let end = dailyTimeToMinutes(document.getElementById("daily-template-entry-end").value, true);
+    if (start === 0 && end === 0) end = 1440;
     const tagId = document.getElementById("daily-template-entry-tag").value;
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("時刻は16:00の形式で入力してな。終了が開始より早い場合は翌日扱いになるで。");
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("時刻を選択してな。終了が開始より早い場合は翌日扱いになるで。");
     const candidate = { start, end };
     if (dailyTemplateDraft.entries.some(item => item.id !== dailyTemplateEntryEditingId && dailyEntriesOverlap(candidate, dailyNormalizeEntry(item)))) return alert("テンプレート内のほかの予定と時間が重なってるで。");
     if (!appData.dailyTags.some(tag => tag.id === tagId)) return alert("タグを選択してな。");
@@ -2828,7 +2832,7 @@ function dailyRenderHistory(content) {
       <div class="daily-history-grid">
         ${dates.length ? dates.map(date => {
           const record = appData.dailyRecords[date];
-          return `<button type="button" class="daily-history-chart-button" data-history-date="${escapeHTML(date)}" aria-label="${escapeHTML(formatDate(parseDate(date)))}の記録を開く">${dailyRenderClock(record.entries, date, "daily-history-clock-wrap")}</button>`;
+          return `<button type="button" class="daily-history-chart-button" data-history-date="${escapeHTML(date)}" aria-label="${escapeHTML(formatDate(parseDate(date)))}の記録を開く"><span class="daily-history-chart">${dailyRenderClock(record.entries, date, "daily-history-clock-wrap")}</span><span class="daily-history-note"><strong>ひとこと</strong><span>${escapeHTML(record.note || "（コメントなし）")}</span></span></button>`;
         }).join("") : `<p class="muted daily-history-empty">過去の記録はまだありません。</p>`}
       </div>
     </div>`;
@@ -2853,7 +2857,7 @@ function renderDailyRecord(content) {
 
   content.innerHTML = `
     <div class="card daily-record-card daily-record-main">
-      <div class="daily-date-toolbar"><h2 class="card-title">1日の記録</h2><input id="daily-record-date" type="date" value="${escapeHTML(dailyRecordDate)}" aria-label="記録する日付"></div>
+      <div class="daily-date-toolbar"><h2 class="card-title">1日の記録</h2><div class="daily-date-actions"><input id="daily-record-date" type="date" value="${escapeHTML(dailyRecordDate)}" aria-label="記録する日付"><button type="button" class="secondary-button daily-today-button" data-action="back-to-today">今日に戻る</button></div></div>
       <button type="button" class="secondary-button daily-template-use-button" data-action="toggle-template-panel">テンプレートを使う</button>
       ${dailyTemplatePanelOpen ? `<div class="daily-template-panel">
         <label>テンプレート<select id="daily-template-select"><option value="">テンプレートを選択</option>${appData.dailyTemplates.map(item => `<option value="${escapeHTML(item.id)}" ${item.id === dailySelectedTemplateId ? "selected" : ""}>${escapeHTML(item.name)}</option>`).join("")}</select></label>
@@ -2896,6 +2900,7 @@ function renderDailyRecord(content) {
     if (action === "toggle-template-panel") { dailyTemplatePanelOpen = !dailyTemplatePanelOpen; renderDailyRecord(content); return; }
     if (action === "open-daily-settings") { dailyRecordView = "settings"; dailyTemplateDraft = null; renderDailyRecord(content); return; }
     if (action === "open-daily-history") { dailyRecordView = "history"; renderDailyRecord(content); return; }
+    if (action === "back-to-today") { dailyRecordDate = todayString(); dailyEntryFormState = null; renderDailyRecord(content); return; }
     if (action === "apply-template") {
       const id = dailySelectedTemplateId || document.getElementById("daily-template-select")?.value;
       const template = appData.dailyTemplates.find(item => item.id === id);
@@ -2934,9 +2939,21 @@ function renderDailyRecord(content) {
     if (normalizedRadius < 0.30 || normalizedRadius > 1.02) return;
     const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
     const minute = Math.floor(angle / 360 * 1440);
-    const hit = entries.find(entry => dailyEntrySegments(entry).some(segment => minute >= segment.start && minute < segment.end));
-    if (hit) dailyEntryFormState = { mode: "edit", entryId: hit.id, start: dailyMinutesToTime(hit.start) };
-    else dailyEntryFormState = { mode: "add", start: dailyMinutesToTime(minute) };
+    const occupied = entries.flatMap(entry => dailyEntrySegments(entry)).sort((a, b) => a.start - b.start);
+    const hitSegment = occupied.find(segment => minute >= segment.start && minute < segment.end);
+    if (hitSegment) {
+      const hit = hitSegment.entry;
+      dailyEntryFormState = { mode: "edit", entryId: hit.id, start: dailyMinutesToTime(hit.start), end: dailyMinutesToTime(hit.end) };
+    } else {
+      let gapStart = 0, gapEnd = 1440;
+      if (occupied.length) {
+        const previous = [...occupied].reverse().find(segment => segment.end <= minute);
+        const next = occupied.find(segment => segment.start > minute);
+        if (previous && next) { gapStart = previous.end; gapEnd = next.start; }
+        else { gapStart = occupied[occupied.length - 1].end; gapEnd = occupied[0].start; }
+      }
+      dailyEntryFormState = { mode: "add", start: dailyMinutesToTime(gapStart), end: dailyMinutesToTime(gapEnd) };
+    }
     renderDailyRecord(content);
     document.getElementById("daily-entry-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
@@ -2945,9 +2962,10 @@ function renderDailyRecord(content) {
   if (entryForm) entryForm.addEventListener("submit", event => {
     event.preventDefault();
     const start = dailyTimeToMinutes(document.getElementById("daily-entry-start").value);
-    const end = dailyTimeToMinutes(document.getElementById("daily-entry-end").value, true);
+    let end = dailyTimeToMinutes(document.getElementById("daily-entry-end").value, true);
+    if (start === 0 && end === 0) end = 1440;
     const tagId = document.getElementById("daily-entry-tag").value;
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("時刻は16:00の形式で入力してな。終了が開始より早い場合は翌日扱いになるで。");
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("時刻を選択してな。終了が開始より早い場合は翌日扱いになるで。");
     const candidate = { start, end };
     if (entries.some(item => item.id !== dailyEntryFormState?.entryId && dailyEntriesOverlap(candidate, item))) return alert("ほかの予定と時間が重なってるで。時間を調整してな。");
     if (!appData.dailyTags.some(tag => tag.id === tagId)) return alert("タグを選択してな。");

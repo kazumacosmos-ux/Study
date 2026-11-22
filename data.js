@@ -4,6 +4,7 @@ const studyData = {
   events: [],
   tasks: [],
   todos: [],
+  dailyRecords: {},
   timetable: {
     weekly: {
       1: ["", "", "", "", "", "", ""],
@@ -34,6 +35,7 @@ const StudyStorage = {
           events: Array.isArray(parsed.events) ? parsed.events : [],
           tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
           todos: Array.isArray(parsed.todos) ? parsed.todos : [],
+          dailyRecords: parsed.dailyRecords && typeof parsed.dailyRecords === "object" ? parsed.dailyRecords : {},
           timetable: {
             weekly: { ...weeklyDefaults, ...(savedTimetable.weekly || {}) },
             changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : [],
@@ -51,11 +53,12 @@ const StudyStorage = {
 
   save(data) {
     try {
-      // 教材管理・学習記録・成績分析の旧データは保存対象から除外
+      // 旧機能のデータは除外し、現在使用する記録データを保存
       const cleanData = {
         events: data.events || [],
         tasks: data.tasks || [],
         todos: data.todos || [],
+        dailyRecords: data.dailyRecords || {},
         timetable: data.timetable || studyData.timetable
       };
       localStorage.setItem("studyData", JSON.stringify(cleanData));

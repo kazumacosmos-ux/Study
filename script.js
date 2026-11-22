@@ -28,7 +28,8 @@ const pageNames = {
   calendar: "カレンダー",
   tasks: "課題管理",
   todo: "TODO",
-  timetable: "時間割"
+  timetable: "時間割",
+  dailyRecord: "1日の記録"
 };
 
 let currentPage = "home";
@@ -51,6 +52,7 @@ let copyToastTimer = null;
 
 // 時間割の表示週（月曜日を基準）
 let timetableWeekStart = null;
+let dailyRecordDate = todayString();
 
 // --------------------------------------
 // 初期化
@@ -221,6 +223,7 @@ function normalizeStudyData(value) {
     events: Array.isArray(source.events) ? source.events : [],
     tasks: Array.isArray(source.tasks) ? source.tasks : [],
     todos: Array.isArray(source.todos) ? source.todos : [],
+    dailyRecords: source.dailyRecords && typeof source.dailyRecords === "object" ? source.dailyRecords : {},
     timetable: {
       weekly: { ...defaults.timetable.weekly, ...(timetable.weekly || {}) },
       changes: Array.isArray(timetable.changes) ? timetable.changes : [],
@@ -407,6 +410,9 @@ function showPage(page) {
       break;
     case "timetable":
       renderTimetable(content);
+      break;
+    case "dailyRecord":
+      renderDailyRecord(content);
       break;
   }
 }
@@ -2438,4 +2444,147 @@ function getTimetableForDate(date) {
       special: Boolean(special)
     };
   });
+}
+
+
+// --------------------------------------
+// 1日の記録
+// --------------------------------------
+
+function renderDailyRecord(content) {
+  if (!appData.dailyRecords || typeof appData.dailyRecords !== "object") {
+    appData.dailyRecords = {};
+  }
+
+  const record = appData.dailyRecords[dailyRecordDate] || {
+    wakeTime: "",
+    sleepTime: "",
+    studyMinutes: "",
+    note: ""
+  };
+
+  const minutes = Number(record.studyMinutes) || 0;
+  const hoursText = Math.floor(minutes / 60);
+  const minutesText = minutes % 60;
+  const recentRecords = Object.keys(appData.dailyRecords)
+    .filter(date => appData.dailyRecords[date] && date <= dailyRecordDate)
+    .sort((a, b) => b.localeCompare(a))
+    .slice(0, 7);
+
+  content.innerHTML = `
+    <div class="card daily-record-card">
+      <div class="calendar-toolbar">
+        <div>
+          <h2 class="card-title" style="margin-bottom:4px;">1日の記録</h2>
+          <p class="muted">起床・就寝時間と勉強時間を、あとからでも記録できるよ。</p>
+        </div>
+        <input id="daily-record-date" type="date" value="${escapeHTML(dailyRecordDate)}" aria-label="記録する日付">
+      </div>
+
+      <form id="daily-record-form">
+        <div class="daily-record-fields">
+          <div class="form-group">
+            <label for="daily-wake-time">起床時間</label>
+            <input id="daily-wake-time" type="time" value="${escapeHTML(record.wakeTime || "")}">
+          </div>
+          <div class="form-group">
+            <label for="daily-sleep-time">就寝時間</label>
+            <input id="daily-sleep-time" type="time" value="${escapeHTML(record.sleepTime || "")}">
+          </div>
+          <div class="form-group">
+            <label for="daily-study-minutes">勉強時間（分）</label>
+            <input id="daily-study-minutes" type="number" min="0" max="1440" step="1" inputmode="numeric" placeholder="例：150" value="${record.studyMinutes === "" || record.studyMinutes == null ? "" : Number(record.studyMinutes)}">
+            <p class="muted">例：1時間30分なら「90」</p>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="daily-record-note">ひとこと（任意）</label>
+          <textarea id="daily-record-note" rows="3" placeholder="今日の振り返りなど">${escapeHTML(record.note || "")}</textarea>
+        </div>
+        <div class="task-form-actions">
+          <button type="submit" class="primary-button">記録を保存</button>
+          <button type="button" class="secondary-button" onclick="clearDailyRecord()">この日の記録を削除</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card daily-record-summary">
+      <h3 class="card-title">この日の記録</h3>
+      <div class="daily-record-stats">
+        <div class="stat-card">
+          <div class="stat-label">起床</div>
+          <div class="stat-value">${record.wakeTime ? escapeHTML(record.wakeTime) : "未記録"}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">就寝</div>
+          <div class="stat-value">${record.sleepTime ? escapeHTML(record.sleepTime) : "未記録"}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">勉強時間</div>
+          <div class="stat-value">${minutes ? `${hoursText > 0 ? `${hoursText}時間` : ""}${minutesText > 0 ? `${minutesText}分` : ""}` : "未記録"}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card daily-record-history">
+      <h3 class="card-title">最近の記録</h3>
+      ${recentRecords.length ? `
+        <div class="item-list">
+          ${recentRecords.map(date => {
+            const item = appData.dailyRecords[date];
+            const study = Number(item.studyMinutes) || 0;
+            const studyLabel = study ? `${Math.floor(study / 60) ? `${Math.floor(study / 60)}時間` : ""}${study % 60 ? `${study % 60}分` : ""}` : "勉強時間未記録";
+            return `<button type="button" class="daily-record-history-item ${date === dailyRecordDate ? "active" : ""}" onclick="selectDailyRecordDate('${date}')">
+              <span><strong>${escapeHTML(formatDate(parseDate(date)))}</strong><small>${escapeHTML(item.note || "メモなし")}</small></span>
+              <span>${escapeHTML(studyLabel)}</span>
+            </button>`;
+          }).join("")}
+        </div>
+      ` : `<p class="muted">まだ記録はありません。</p>`}
+    </div>
+  `;
+
+  document.getElementById("daily-record-date").addEventListener("change", event => {
+    if (!event.target.value) return;
+    dailyRecordDate = event.target.value;
+    renderDailyRecord(document.getElementById("page-content"));
+  });
+
+  document.getElementById("daily-record-form").addEventListener("submit", event => {
+    event.preventDefault();
+    const studyInput = document.getElementById("daily-study-minutes").value;
+    const studyMinutes = studyInput === "" ? "" : Number(studyInput);
+    if (studyMinutes !== "" && (!Number.isInteger(studyMinutes) || studyMinutes < 0 || studyMinutes > 1440)) {
+      alert("勉強時間は0〜1440分で入力してな。");
+      return;
+    }
+
+    const savedRecord = {
+      wakeTime: document.getElementById("daily-wake-time").value,
+      sleepTime: document.getElementById("daily-sleep-time").value,
+      studyMinutes,
+      note: document.getElementById("daily-record-note").value.trim()
+    };
+
+    if (!savedRecord.wakeTime && !savedRecord.sleepTime && savedRecord.studyMinutes === "" && !savedRecord.note) {
+      delete appData.dailyRecords[dailyRecordDate];
+    } else {
+      appData.dailyRecords[dailyRecordDate] = savedRecord;
+    }
+    saveData();
+    renderDailyRecord(document.getElementById("page-content"));
+  });
+}
+
+function selectDailyRecordDate(date) {
+  dailyRecordDate = date;
+  renderDailyRecord(document.getElementById("page-content"));
+}
+
+function clearDailyRecord() {
+  if (!appData.dailyRecords || !appData.dailyRecords[dailyRecordDate]) return;
+  if (!confirm(`${formatDate(parseDate(dailyRecordDate))}の記録を削除しますか？`)) return;
+  delete appData.dailyRecords[dailyRecordDate];
+  saveData();
+  renderDailyRecord(document.getElementById("page-content"));
 }

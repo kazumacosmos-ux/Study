@@ -2028,3 +2028,114 @@ textarea:focus {
 @media (min-width: 700px) {
   .special-timetable-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+
+/* 1日の記録 */
+.daily-record-card,
+.daily-record-summary,
+.daily-record-history {
+  margin-bottom: 18px;
+}
+
+.daily-record-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.daily-record-fields .form-group {
+  min-width: 0;
+}
+
+.daily-record-fields .muted {
+  margin: 6px 0 0;
+  font-size: 11px;
+}
+
+.daily-record-card .calendar-toolbar {
+  align-items: flex-start;
+}
+
+.daily-record-card .calendar-toolbar input[type="date"] {
+  max-width: 190px;
+}
+
+.daily-record-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.daily-record-stats .stat-card {
+  min-width: 0;
+}
+
+.daily-record-stats .stat-value {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.daily-record-history-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.daily-record-history-item:last-child {
+  border-bottom: 0;
+}
+
+.daily-record-history-item.active {
+  color: var(--primary);
+}
+
+.daily-record-history-item span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.daily-record-history-item small {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 52vw;
+  font-size: 11px;
+}
+
+.daily-record-history-item span:last-child {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+@media (max-width: 700px) {
+  .daily-record-fields {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .daily-record-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-record-card .calendar-toolbar {
+    flex-direction: column;
+  }
+
+  .daily-record-card .calendar-toolbar input[type="date"] {
+    max-width: none;
+  }
+}

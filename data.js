@@ -5,6 +5,18 @@ const studyData = {
   tasks: [],
   todos: [],
   dailyRecords: {},
+  dailyTags: [
+    { id: "sleep", name: "睡眠", color: "#8295e5" },
+    { id: "study", name: "勉強", color: "#d58dad" },
+    { id: "school", name: "学校", color: "#58a68b" },
+    { id: "club", name: "部活", color: "#e5b65b" },
+    { id: "commute", name: "通学・移動", color: "#70a9c9" },
+    { id: "meal", name: "食事", color: "#d58b68" },
+    { id: "bath", name: "入浴", color: "#8bb9b4" },
+    { id: "free", name: "自由時間", color: "#a78bd4" },
+    { id: "other", name: "その他", color: "#9aa1ad" }
+  ],
+  dailyTemplates: [],
   timetable: {
     weekly: {
       1: ["", "", "", "", "", "", ""],
@@ -36,6 +48,8 @@ const StudyStorage = {
           tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
           todos: Array.isArray(parsed.todos) ? parsed.todos : [],
           dailyRecords: parsed.dailyRecords && typeof parsed.dailyRecords === "object" ? parsed.dailyRecords : {},
+          dailyTags: Array.isArray(parsed.dailyTags) ? parsed.dailyTags : JSON.parse(JSON.stringify(studyData.dailyTags)),
+          dailyTemplates: Array.isArray(parsed.dailyTemplates) ? parsed.dailyTemplates : [],
           timetable: {
             weekly: { ...weeklyDefaults, ...(savedTimetable.weekly || {}) },
             changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : [],
@@ -59,6 +73,8 @@ const StudyStorage = {
         tasks: data.tasks || [],
         todos: data.todos || [],
         dailyRecords: data.dailyRecords || {},
+        dailyTags: data.dailyTags || [],
+        dailyTemplates: data.dailyTemplates || [],
         timetable: data.timetable || studyData.timetable
       };
       localStorage.setItem("studyData", JSON.stringify(cleanData));

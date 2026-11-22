@@ -2349,3 +2349,62 @@ textarea:focus {
   .daily-template-entry-row button { padding: 7px 8px; font-size: 11px; }
   .daily-entry-form .daily-entry-time-fields { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
 }
+
+/* 1日の記録：画面構成・設定・過去データ */
+.daily-date-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.daily-date-toolbar .card-title { margin: 0; }
+.daily-date-toolbar input[type="date"] { width: auto; max-width: 190px; }
+.daily-entry-editor-slot { display: grid; gap: 10px; }
+.daily-note-section { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft, #fafbfe); }
+.daily-note-section form { display: grid; gap: 9px; }
+.daily-note-section label { color: var(--text); font-weight: 650; font-size: 13px; }
+.daily-note-section textarea { width: 100%; min-height: 76px; resize: vertical; }
+.daily-note-section button { justify-self: end; min-width: 130px; }
+.daily-past-data-button,
+.daily-settings-button,
+.daily-back-button { width: 100%; min-height: 46px; }
+.daily-past-data-button { margin-top: 16px; }
+.daily-settings-button { margin-top: 9px; }
+.daily-back-button { margin-bottom: 16px; text-align: left; }
+.daily-clock-hole strong { font-size: clamp(18px, 4.5vw, 24px); line-height: 1.2; }
+.daily-clock-hole small { margin-top: 3px; font-size: 11px; }
+.daily-history-page { padding: 8px 0; }
+.daily-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 12px;
+}
+.daily-history-chart-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+}
+.daily-history-chart-button:active { background: var(--surface-soft, #f7f8fb); }
+.daily-history-chart-button .daily-clock-wrap { padding: 0; width: 100%; }
+.daily-history-chart-button .daily-clock { width: min(100%, 220px); cursor: pointer; }
+.daily-history-empty { grid-column: 1 / -1; padding: 24px 8px; text-align: center; }
+.daily-record-card > .daily-tag-manager,
+.daily-record-card > .daily-template-manager { margin-top: 14px; }
+.daily-tag-manager .daily-tag-row { margin-top: 8px; }
+.daily-template-manager > .daily-section-heading { align-items: center; }
+.daily-template-manager > .daily-section-heading .card-title { margin: 0; }
+@media (max-width: 600px) {
+  .daily-date-toolbar { align-items: stretch; flex-direction: column; }
+  .daily-date-toolbar input[type="date"] { width: 100%; max-width: none; }
+  .daily-history-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .daily-history-chart-button { padding: 5px; }
+  .daily-history-chart-button .daily-clock { width: 100%; }
+  .daily-note-section button { width: 100%; }
+}

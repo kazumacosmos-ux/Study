@@ -2450,7 +2450,7 @@ function getTimetableForDate(date) {
 
 
 // --------------------------------------
-// 1日の記録・生活時間テンプレート
+// 1日の記録・24時間タイムチャート
 // --------------------------------------
 
 const DEFAULT_DAILY_TAGS = [
@@ -2465,7 +2465,14 @@ const DEFAULT_DAILY_TAGS = [
   { id: "other", name: "その他", color: "#9aa1ad" }
 ];
 
+let dailyRecordOpen = false;
+let dailyEntryFormState = null;
+let dailyTemplatePanelOpen = false;
 let dailySelectedTemplateId = "";
+let dailyTemplateManagerOpen = false;
+let dailyTemplateDraft = null;
+let dailyTemplateEntryFormOpen = false;
+let dailyTemplateEntryEditingId = "";
 
 function ensureDailyRecordData() {
   if (!appData.dailyRecords || typeof appData.dailyRecords !== "object") appData.dailyRecords = {};
@@ -2477,15 +2484,16 @@ function dailyMakeId(prefix = "item") {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function dailyTimeToMinutes(value) {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) return NaN;
+function dailyTimeToMinutes(value, allow24 = false) {
+  if (allow24 && value === "24:00") return 1440;
+  if (!value || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return NaN;
   const [hour, minute] = value.split(":").map(Number);
-  if (hour > 23 || minute > 59) return NaN;
   return hour * 60 + minute;
 }
 
 function dailyMinutesToTime(value) {
-  const minutes = Math.max(0, Math.min(1439, Number(value) || 0));
+  if (Number(value) === 1440) return "24:00";
+  const minutes = ((Math.round(Number(value) || 0) % 1440) + 1440) % 1440;
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
@@ -2512,7 +2520,7 @@ function dailyTagSnapshot(tagId, fallback = {}) {
 
 function dailyNormalizeEntry(entry) {
   const start = Number.isInteger(entry.start) ? entry.start : dailyTimeToMinutes(entry.startTime);
-  let end = Number.isInteger(entry.end) ? entry.end : dailyTimeToMinutes(entry.endTime);
+  let end = Number.isInteger(entry.end) ? entry.end : dailyTimeToMinutes(entry.endTime, true);
   if (entry.end24 === true || entry.end === 1440) end = 1440;
   if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= 1440 || end < 0 || end > 1440 || end === start) return null;
   const snapshot = entry.tagName ? {
@@ -2520,12 +2528,7 @@ function dailyNormalizeEntry(entry) {
     tagName: entry.tagName,
     tagColor: dailySafeColor(entry.tagColor)
   } : dailyTagSnapshot(entry.tagId, entry);
-  return {
-    id: entry.id || dailyMakeId("activity"),
-    start,
-    end,
-    ...snapshot
-  };
+  return { id: entry.id || dailyMakeId("activity"), start, end, ...snapshot };
 }
 
 function dailyGetRecord(date = dailyRecordDate) {
@@ -2555,22 +2558,22 @@ function dailyEntryDuration(entry) {
   return entry.end > entry.start ? entry.end - entry.start : 1440 - entry.start + entry.end;
 }
 
-function dailyCalculateBreakdown(entries) {
+function dailyGetBreakdown(entries) {
   const totals = {};
   const labels = {};
   const colors = {};
   let cursor = 0;
-  const normalized = (Array.isArray(entries) ? entries : []).map(dailyNormalizeEntry).filter(Boolean);
-  const sorted = normalized.flatMap(dailyEntrySegments).sort((a, b) => a.start - b.start || a.end - b.end);
-
+  const sorted = (Array.isArray(entries) ? entries : [])
+    .map(dailyNormalizeEntry).filter(Boolean)
+    .flatMap(dailyEntrySegments).sort((a, b) => a.start - b.start || a.end - b.end);
   sorted.forEach(segment => {
     const entry = segment.entry;
-    const start = Math.max(cursor, segment.start);
-    if (start > cursor) {
-      totals.unassigned = (totals.unassigned || 0) + start - cursor;
+    if (segment.start > cursor) {
+      totals.unassigned = (totals.unassigned || 0) + segment.start - cursor;
       labels.unassigned = "未登録";
       colors.unassigned = "#dfe3ea";
     }
+    const start = Math.max(cursor, segment.start);
     const end = Math.max(start, segment.end);
     if (end > start) {
       const key = entry.tagId || `snapshot_${entry.tagName}`;
@@ -2586,42 +2589,101 @@ function dailyCalculateBreakdown(entries) {
     colors.unassigned = "#dfe3ea";
   }
   return Object.keys(totals).map(key => ({ key, name: labels[key], minutes: totals[key], color: colors[key] }))
-    .filter(item => item.minutes > 0)
-    .sort((a, b) => b.minutes - a.minutes);
+    .filter(item => item.minutes > 0).sort((a, b) => b.minutes - a.minutes);
 }
 
 function dailyGetStudyMinutes(record) {
   if (Array.isArray(record.entries) && record.entries.length) {
-    return record.entries.reduce((sum, entry) => sum + ((entry.tagId === "study" || entry.tagName === "勉強") ? dailyEntryDuration(entry) : 0), 0);
+    return record.entries.reduce((sum, raw) => {
+      const entry = dailyNormalizeEntry(raw);
+      return sum + (entry && (entry.tagId === "study" || entry.tagName === "勉強") ? dailyEntryDuration(entry) : 0);
+    }, 0);
   }
   return Number(record.studyMinutes) || 0;
 }
 
-function dailyRenderPie(entries) {
-  const breakdown = dailyCalculateBreakdown(entries);
+function dailyRenderClock(entries) {
+  const segments = (Array.isArray(entries) ? entries : [])
+    .map(dailyNormalizeEntry).filter(Boolean)
+    .flatMap(dailyEntrySegments).sort((a, b) => a.start - b.start);
+  const stops = [];
   let cursor = 0;
-  const stops = breakdown.map(item => {
-    const start = cursor / 1440 * 100;
-    cursor += item.minutes;
-    const end = cursor / 1440 * 100;
-    return `${item.color} ${start.toFixed(3)}% ${end.toFixed(3)}%`;
+  segments.forEach(segment => {
+    if (segment.start > cursor) {
+      stops.push(`#dfe3ea ${(cursor / 1440 * 360).toFixed(2)}deg ${(segment.start / 1440 * 360).toFixed(2)}deg`);
+    }
+    const start = Math.max(cursor, segment.start);
+    const end = Math.max(start, segment.end);
+    if (end > start) {
+      stops.push(`${dailySafeColor(segment.entry.tagColor)} ${(start / 1440 * 360).toFixed(2)}deg ${(end / 1440 * 360).toFixed(2)}deg`);
+      cursor = end;
+    }
   });
-  const gradient = stops.length ? `conic-gradient(${stops.join(",")})` : "conic-gradient(#dfe3ea 0% 100%)";
+  if (cursor < 1440) stops.push(`#dfe3ea ${(cursor / 1440 * 360).toFixed(2)}deg 360deg`);
+  const gradient = stops.length ? `conic-gradient(${stops.join(",")})` : "conic-gradient(#dfe3ea 0deg 360deg)";
   return `
-    <div class="daily-pie-layout">
-      <div class="daily-pie" style="background:${gradient}"><div class="daily-pie-center"><strong>24時間</strong><small>時間配分</small></div></div>
-      <div class="daily-pie-legend">
-        ${breakdown.map(item => `<div class="daily-pie-legend-row"><span class="daily-pie-dot" style="background:${item.color}"></span><span class="daily-pie-name">${escapeHTML(item.name)}</span><strong>${dailyFormatDuration(item.minutes)}</strong><small>${(item.minutes / 1440 * 100).toFixed(1)}%</small></div>`).join("")}
+    <div class="daily-clock-wrap">
+      <div class="daily-clock" role="img" aria-label="24時間タイムチャート。空白部分をタップすると予定を追加、色の付いた部分をタップすると編集できます。" style="background:${gradient}">
+        <div class="daily-clock-hole"><strong>24時間</strong><small>0時から時計回り</small></div>
+        <span class="daily-clock-label daily-clock-12">0</span>
+        <span class="daily-clock-label daily-clock-3">6</span>
+        <span class="daily-clock-label daily-clock-6">12</span>
+        <span class="daily-clock-label daily-clock-9">18</span>
       </div>
     </div>`;
+}
+
+function dailyRenderBreakdown(entries) {
+  const breakdown = dailyGetBreakdown(entries);
+  return `<div class="daily-pie-legend">${breakdown.map(item => `
+    <div class="daily-pie-legend-row"><span class="daily-pie-dot" style="background:${item.color}"></span><span class="daily-pie-name">${escapeHTML(item.name)}</span><strong>${dailyFormatDuration(item.minutes)}</strong><small>${(item.minutes / 1440 * 100).toFixed(1)}%</small></div>`).join("")}</div>`;
 }
 
 function dailyTagOptions(selectedId, fallbackEntry = null) {
   const options = appData.dailyTags.map(tag => `<option value="${escapeHTML(tag.id)}" ${tag.id === selectedId ? "selected" : ""}>${escapeHTML(tag.name)}</option>`);
   if (selectedId && !appData.dailyTags.some(tag => tag.id === selectedId) && fallbackEntry) {
-    options.push(`<option value="${escapeHTML(selectedId)}" selected>${escapeHTML(fallbackEntry.tagName || "削除済みタグ") }（過去のタグ）</option>`);
+    options.push(`<option value="${escapeHTML(selectedId)}" selected>${escapeHTML(fallbackEntry.tagName || "削除済みタグ")}（過去のタグ）</option>`);
   }
   return options.join("");
+}
+
+function dailyRenderEntryForm(mode, entry = null, startValue = "08:00") {
+  const isEdit = mode === "edit";
+  const start = entry ? dailyMinutesToTime(entry.start) : startValue;
+  const end = entry ? dailyMinutesToTime(entry.end) : dailyMinutesToTime((dailyTimeToMinutes(startValue) + 60) % 1440);
+  const selectedTag = entry ? entry.tagId : (appData.dailyTags[0]?.id || "");
+  return `<form id="daily-entry-form" class="daily-entry-form" data-mode="${mode}" data-entry-id="${escapeHTML(entry?.id || "")}">
+    <div class="daily-entry-form-heading"><strong>${isEdit ? "予定を編集" : "予定を追加"}</strong><button type="button" class="icon-text-button" data-action="close-entry-form">閉じる</button></div>
+    <div class="daily-entry-time-fields">
+      <label>開始時刻<input id="daily-entry-start" type="text" inputmode="text" maxlength="5" placeholder="16:00" value="${escapeHTML(start)}" required></label>
+      <span>〜</span>
+      <label>終了時刻<input id="daily-entry-end" type="text" inputmode="text" maxlength="5" placeholder="18:00 / 24:00" value="${escapeHTML(end)}" required></label>
+    </div>
+    <label class="daily-entry-tag-label">タグ<select id="daily-entry-tag" required>${dailyTagOptions(selectedTag, entry)}</select></label>
+    <div class="daily-entry-form-actions"><button type="submit" class="primary-button" ${appData.dailyTags.length ? "" : "disabled"}>${isEdit ? "変更を保存" : "予定を登録"}</button>${isEdit ? `<button type="button" class="danger-button" data-action="delete-current-entry">削除</button>` : ""}</div>
+    <p class="muted">例：23:00〜06:00のように終了時刻が開始時刻より早い場合は翌日扱い。24:00も入力できるよ。</p>
+    ${appData.dailyTags.length ? "" : `<p class="muted">先にタグを追加してな。</p>`}
+  </form>`;
+}
+
+function dailyRenderTemplateEditor() {
+  if (!dailyTemplateDraft) return "";
+  const draft = dailyTemplateDraft;
+  const entries = (draft.entries || []).map(dailyNormalizeEntry).filter(Boolean).sort((a, b) => a.start - b.start);
+  const editEntry = entries.find(item => item.id === dailyTemplateEntryEditingId);
+  return `<div class="daily-template-editor">
+    <div class="daily-section-heading"><strong>${draft.id ? "テンプレートを編集" : "新しいテンプレート"}</strong><button type="button" class="icon-text-button" data-action="close-template-editor">閉じる</button></div>
+    <label class="daily-template-name-label">テンプレート名<input id="daily-template-name" type="text" maxlength="30" placeholder="例：平日（部活あり）" value="${escapeHTML(draft.name || "")}"></label>
+    <div class="daily-template-entry-list">${entries.length ? entries.map(entry => `<div class="daily-template-entry-row"><span class="daily-entry-color" style="background:${dailySafeColor(entry.tagColor)}"></span><span><strong>${escapeHTML(entry.tagName)}</strong><small>${dailyMinutesToTime(entry.start)}〜${dailyMinutesToTime(entry.end)}</small></span><button type="button" class="secondary-button" data-action="edit-template-entry" data-entry-id="${escapeHTML(entry.id)}">編集</button><button type="button" class="danger-button" data-action="delete-template-entry" data-entry-id="${escapeHTML(entry.id)}">削除</button></div>`).join("") : `<p class="muted">まだ予定がありません。空の状態から1件ずつ追加できるよ。</p>`}</div>
+    <button type="button" class="secondary-button" data-action="add-template-entry">＋ 予定を追加</button>
+    ${dailyTemplateEntryFormOpen ? `<form id="daily-template-entry-form" class="daily-entry-form" data-entry-id="${escapeHTML(editEntry?.id || "")}">
+      <strong>${editEntry ? "テンプレートの予定を編集" : "テンプレートに予定を追加"}</strong>
+      <div class="daily-entry-time-fields"><label>開始時刻<input id="daily-template-entry-start" type="text" inputmode="text" maxlength="5" placeholder="16:00" value="${editEntry ? dailyMinutesToTime(editEntry.start) : "08:00"}" required></label><span>〜</span><label>終了時刻<input id="daily-template-entry-end" type="text" inputmode="text" maxlength="5" placeholder="18:00 / 24:00" value="${editEntry ? dailyMinutesToTime(editEntry.end) : "09:00"}" required></label></div>
+      <label class="daily-entry-tag-label">タグ<select id="daily-template-entry-tag" required>${dailyTagOptions(editEntry?.tagId || appData.dailyTags[0]?.id || "", editEntry)}</select></label>
+      <div class="daily-entry-form-actions"><button type="submit" class="primary-button" ${appData.dailyTags.length ? "" : "disabled"}>${editEntry ? "変更を保存" : "追加"}</button><button type="button" class="secondary-button" data-action="cancel-template-entry">キャンセル</button></div>
+    </form>` : ""}
+    <div class="daily-entry-form-actions"><button type="button" class="primary-button" data-action="save-template">テンプレートを保存</button><button type="button" class="secondary-button" data-action="close-template-editor">キャンセル</button></div>
+  </div>`;
 }
 
 function renderDailyRecord(content) {
@@ -2629,200 +2691,202 @@ function renderDailyRecord(content) {
   const record = appData.dailyRecords[dailyRecordDate] || { wakeTime: "", sleepTime: "", studyMinutes: "", note: "", entries: [] };
   const entries = (Array.isArray(record.entries) ? record.entries : []).map(dailyNormalizeEntry).filter(Boolean).sort((a, b) => a.start - b.start);
   const studyMinutes = dailyGetStudyMinutes({ ...record, entries });
-  const recentRecords = Object.keys(appData.dailyRecords)
-    .filter(date => appData.dailyRecords[date] && date <= dailyRecordDate)
-    .sort((a, b) => b.localeCompare(a)).slice(0, 7);
+  const recentRecords = Object.keys(appData.dailyRecords).filter(date => appData.dailyRecords[date] && date <= dailyRecordDate).sort((a, b) => b.localeCompare(a)).slice(0, 7);
   const selectedTemplate = appData.dailyTemplates.find(item => item.id === dailySelectedTemplateId);
+  const addStart = dailyEntryFormState?.mode === "add" ? dailyEntryFormState.start : dailyMinutesToTime(Math.floor((new Date().getHours() * 60 + new Date().getMinutes()) / 5) * 5);
 
   content.innerHTML = `
-    <div class="card daily-record-card">
-      <div class="calendar-toolbar">
-        <div><h2 class="card-title" style="margin-bottom:4px;">1日の記録</h2><p class="muted">1日分の予定を時間帯ごとに追加して、あとから自由に編集できるよ。</p></div>
-        <input id="daily-record-date" type="date" value="${escapeHTML(dailyRecordDate)}" aria-label="記録する日付">
-      </div>
-      <div class="daily-template-tools">
-        <div class="form-group"><label for="daily-template-select">テンプレートを選択</label><select id="daily-template-select"><option value="">テンプレートを選択</option>${appData.dailyTemplates.map(item => `<option value="${escapeHTML(item.id)}" ${item.id === dailySelectedTemplateId ? "selected" : ""}>${escapeHTML(item.name)}</option>`).join("")}</select></div>
-        <button type="button" class="secondary-button" id="daily-template-apply" ${selectedTemplate ? "" : "disabled"}>この日に適用</button>
-      </div>
-      <div class="daily-template-tools daily-template-save-tools">
-        <div class="form-group"><label for="daily-template-name">テンプレート名</label><input id="daily-template-name" type="text" maxlength="30" placeholder="例：平日（部活あり）" value="${escapeHTML(selectedTemplate?.name || "")}"></div>
-        <div class="daily-template-buttons">
-          <button type="button" class="secondary-button" id="daily-template-create">この日の予定を新規保存</button>
-          <button type="button" class="secondary-button" id="daily-template-update" ${selectedTemplate ? "" : "disabled"}>選択中のテンプレートを更新</button>
-          <button type="button" class="danger-button" id="daily-template-delete" ${selectedTemplate ? "" : "disabled"}>削除</button>
-        </div>
-      </div>
+    <div class="card daily-record-card daily-record-main">
+      <div class="calendar-toolbar"><div><h2 class="card-title" style="margin-bottom:4px;">1日の記録</h2><p class="muted">1日の過ごし方を24時間の円形チャートで記録できるよ。</p></div><input id="daily-record-date" type="date" value="${escapeHTML(dailyRecordDate)}" aria-label="記録する日付"></div>
+      ${!dailyRecordOpen ? `<button type="button" class="primary-button daily-open-record-button" data-action="open-daily-record">＋ 今日の予定を追加</button>` : `
+        <div class="daily-expanded-record">
+          <button type="button" class="secondary-button daily-template-use-button" data-action="toggle-template-panel">テンプレートを使う</button>
+          ${dailyTemplatePanelOpen ? `<div class="daily-template-panel">
+            <label>テンプレート<select id="daily-template-select"><option value="">テンプレートを選択</option>${appData.dailyTemplates.map(item => `<option value="${escapeHTML(item.id)}" ${item.id === dailySelectedTemplateId ? "selected" : ""}>${escapeHTML(item.name)}</option>`).join("")}</select></label>
+            <button type="button" class="primary-button" data-action="apply-template" ${appData.dailyTemplates.length ? "" : "disabled"}>この日の予定に適用</button>
+            <button type="button" class="secondary-button" data-action="toggle-template-manager">テンプレートを作成・編集</button>
+            ${dailyTemplateManagerOpen ? `<div class="daily-template-manager-panel">
+              <div class="daily-section-heading"><strong>テンプレート管理</strong><button type="button" class="primary-button" data-action="create-template">＋ 新規作成</button></div>
+              ${appData.dailyTemplates.length ? appData.dailyTemplates.map(item => `<div class="daily-template-row"><strong>${escapeHTML(item.name)}</strong><small>${(item.entries || []).length}件</small><button type="button" class="secondary-button" data-action="edit-template" data-template-id="${escapeHTML(item.id)}">編集</button><button type="button" class="danger-button" data-action="delete-template" data-template-id="${escapeHTML(item.id)}">削除</button></div>`).join("") : `<p class="muted">テンプレートはまだありません。</p>`}
+              ${dailyRenderTemplateEditor()}
+            </div>` : ""}
+          </div>` : ""}
+          <section class="daily-clock-section">
+            <h3 class="card-title">24時間タイムチャート</h3>
+            <p class="muted">0時が上、12時が下。空白部分をタップすると追加、色の付いた部分をタップすると編集できるよ。</p>
+            ${dailyRenderClock(entries)}
+            ${dailyRenderBreakdown(entries)}
+          </section>
+          <section class="daily-entries-section">
+            <div class="daily-section-heading"><h3 class="card-title">登録済みの予定</h3><span class="daily-entry-count">${entries.length}件</span></div>
+            ${entries.length ? `<div class="daily-entry-list">${entries.map(entry => `<button type="button" class="daily-entry-list-item" data-action="edit-entry" data-entry-id="${escapeHTML(entry.id)}"><span class="daily-entry-color" style="background:${dailySafeColor(entry.tagColor)}"></span><span class="daily-entry-list-main"><strong>${escapeHTML(entry.tagName)}</strong><small>${dailyMinutesToTime(entry.start)}〜${dailyMinutesToTime(entry.end)}</small></span><span class="daily-entry-duration">${dailyFormatDuration(dailyEntryDuration(entry))}</span><span class="daily-entry-chevron">›</span></button>`).join("")}</div>` : `<p class="muted daily-empty-message">まだ予定がありません。円グラフの空白部分からも追加できるよ。</p>`}
+            <button type="button" class="primary-button daily-add-entry-button" data-action="open-add-entry">＋ 予定を追加</button>
+            ${dailyEntryFormState ? dailyRenderEntryForm(dailyEntryFormState.mode, entries.find(item => item.id === dailyEntryFormState.entryId), dailyEntryFormState.start || addStart) : ""}
+          </section>
+        </div>`}
     </div>
 
-    <div class="card daily-schedule-card">
-      <div class="daily-section-heading"><div><h3 class="card-title">この日の予定</h3><p class="muted">時間帯を1件ずつ追加。保存後も各行から変更・削除できるよ。</p></div><span class="daily-entry-count">${entries.length}件</span></div>
-      ${entries.length ? `<div class="daily-entry-list">${entries.map(entry => `
-        <div class="daily-entry-row" data-entry-id="${escapeHTML(entry.id)}">
-          <div class="daily-entry-time-fields"><label>開始<input type="time" class="daily-entry-start" value="${dailyMinutesToTime(entry.start)}"></label><span>〜</span><label>終了<div class="daily-end-control"><input type="time" class="daily-entry-end" value="${entry.end === 1440 ? "23:59" : dailyMinutesToTime(entry.end)}" ${entry.end === 1440 ? "disabled" : ""}><label class="daily-end24"><input type="checkbox" class="daily-entry-end24" ${entry.end === 1440 ? "checked" : ""}>24:00</label></div></label></div>
-          <label class="daily-entry-tag-label">タグ<select class="daily-entry-tag">${dailyTagOptions(entry.tagId, entry)}</select></label>
-          <div class="daily-entry-actions"><button type="button" class="secondary-button" data-action="save-entry">変更</button><button type="button" class="danger-button" data-action="delete-entry">削除</button></div>
-        </div>`).join("")}</div>` : `<p class="muted daily-empty-message">まだ予定がありません。下から1件ずつ追加できるよ。</p>`}
-      <form id="daily-entry-add-form" class="daily-entry-add-form">
-        <h4>予定を追加</h4>
-        <div class="daily-entry-time-fields"><label>開始<input type="time" id="daily-entry-add-start" required></label><span>〜</span><label>終了<div class="daily-end-control"><input type="time" id="daily-entry-add-end" required><label class="daily-end24"><input type="checkbox" id="daily-entry-add-end24">24:00</label></div></label></div>
-        <div class="daily-entry-add-bottom"><label>タグ<select id="daily-entry-add-tag" required>${appData.dailyTags.map(tag => `<option value="${escapeHTML(tag.id)}">${escapeHTML(tag.name)}</option>`).join("")}</select></label><button type="submit" class="primary-button" ${appData.dailyTags.length ? "" : "disabled"}>予定を追加</button></div>
-        <p class="muted">終了時刻が開始時刻より早い場合は、翌日までの予定として扱うよ。例：23:00〜06:00</p>
-        ${appData.dailyTags.length ? "" : `<p class="muted">先にタグを追加してな。</p>`}
-      </form>
-    </div>
+    <div class="card daily-record-card"><h3 class="card-title">基本情報</h3><form id="daily-record-form"><div class="daily-record-fields">
+      <div class="form-group"><label for="daily-wake-time">起床時間</label><input id="daily-wake-time" type="time" value="${escapeHTML(record.wakeTime || "")}"></div>
+      <div class="form-group"><label for="daily-sleep-time">就寝時間</label><input id="daily-sleep-time" type="time" value="${escapeHTML(record.sleepTime || "")}"></div>
+      <div class="form-group"><label>勉強時間（自動集計）</label><div class="daily-auto-study">${studyMinutes ? dailyFormatDuration(studyMinutes) : "未記録"}</div><p class="muted">「勉強」タグの時間から計算</p></div>
+    </div><div class="form-group"><label for="daily-record-note">ひとこと（任意）</label><textarea id="daily-record-note" rows="3" placeholder="今日の振り返りなど">${escapeHTML(record.note || "")}</textarea></div><div class="task-form-actions"><button type="submit" class="primary-button">基本情報を保存</button><button type="button" class="secondary-button" id="daily-record-clear">この日の記録を削除</button></div></form></div>
 
-    <div class="card daily-pie-card">
-      <h3 class="card-title">1日の時間配分</h3>
-      <p class="muted">登録していない時間は「未登録」として表示するよ。</p>
-      ${dailyRenderPie(entries)}
-    </div>
-
-    <div class="card daily-record-card">
-      <h3 class="card-title">基本情報</h3>
-      <form id="daily-record-form">
-        <div class="daily-record-fields">
-          <div class="form-group"><label for="daily-wake-time">起床時間</label><input id="daily-wake-time" type="time" value="${escapeHTML(record.wakeTime || "")}"></div>
-          <div class="form-group"><label for="daily-sleep-time">就寝時間</label><input id="daily-sleep-time" type="time" value="${escapeHTML(record.sleepTime || "")}"></div>
-          <div class="form-group"><label>勉強時間（自動集計）</label><div class="daily-auto-study">${studyMinutes ? dailyFormatDuration(studyMinutes) : "未記録"}</div><p class="muted">「勉強」タグの時間から計算</p></div>
-        </div>
-        <div class="form-group"><label for="daily-record-note">ひとこと（任意）</label><textarea id="daily-record-note" rows="3" placeholder="今日の振り返りなど">${escapeHTML(record.note || "")}</textarea></div>
-        <div class="task-form-actions"><button type="submit" class="primary-button">基本情報を保存</button><button type="button" class="secondary-button" id="daily-record-clear">この日の記録を削除</button></div>
-      </form>
-    </div>
-
-    <div class="card daily-tag-manager">
-      <h3 class="card-title">タグの管理</h3><p class="muted">予定1件につきタグは1つ。タグ名や色を自由に変更できるよ。過去の記録には当時の名前と色を残すよ。</p>
+    <div class="card daily-tag-manager"><h3 class="card-title">タグの管理</h3><p class="muted">予定1件につきタグは1つ。タグ名や色を変更できるよ。過去の記録には登録当時の名前と色を残すよ。</p>
       <form id="daily-tag-add-form" class="daily-tag-add-form"><label>新しいタグ<input id="daily-tag-new-name" type="text" maxlength="20" placeholder="例：読書" required></label><label>色<input id="daily-tag-new-color" type="color" value="#8295e5"></label><button type="submit" class="secondary-button">タグを追加</button></form>
       <div class="daily-tag-list">${appData.dailyTags.map(tag => `<div class="daily-tag-row" data-tag-id="${escapeHTML(tag.id)}"><input class="daily-tag-edit-name" type="text" maxlength="20" value="${escapeHTML(tag.name)}" aria-label="タグ名"><input class="daily-tag-edit-color" type="color" value="${dailySafeColor(tag.color)}" aria-label="タグの色"><button type="button" class="secondary-button" data-action="save-tag">保存</button><button type="button" class="danger-button" data-action="delete-tag">削除</button></div>`).join("")}</div>
     </div>
 
-    <div class="card daily-record-history">
-      <h3 class="card-title">最近の記録</h3>
-      ${recentRecords.length ? `<div class="item-list">${recentRecords.map(date => {
-        const item = appData.dailyRecords[date];
-        const study = dailyGetStudyMinutes(item);
-        const studyLabel = study ? `勉強 ${dailyFormatDuration(study)}` : "勉強時間未記録";
-        return `<button type="button" class="daily-record-history-item ${date === dailyRecordDate ? "active" : ""}" data-record-date="${escapeHTML(date)}"><span><strong>${escapeHTML(formatDate(parseDate(date)))}</strong><small>${escapeHTML(item.note || "メモなし")}</small></span><span>${escapeHTML(studyLabel)}</span></button>`;
-      }).join("")}</div>` : `<p class="muted">まだ記録はありません。</p>`}
-    </div>
+    <div class="card daily-record-history"><h3 class="card-title">最近の記録</h3>${recentRecords.length ? `<div class="item-list">${recentRecords.map(date => { const item = appData.dailyRecords[date]; const study = dailyGetStudyMinutes(item); const studyLabel = study ? `勉強 ${dailyFormatDuration(study)}` : "勉強時間未記録"; return `<button type="button" class="daily-record-history-item ${date === dailyRecordDate ? "active" : ""}" data-record-date="${escapeHTML(date)}"><span><strong>${escapeHTML(formatDate(parseDate(date)))}</strong><small>${escapeHTML(item.note || "メモなし")}</small></span><span>${escapeHTML(studyLabel)}</span></button>`; }).join("")}</div>` : `<p class="muted">まだ記録はありません。</p>`}</div>
   `;
 
-  document.getElementById("daily-record-date").addEventListener("change", event => {
-    if (!event.target.value) return;
-    dailyRecordDate = event.target.value;
-    renderDailyRecord(document.getElementById("page-content"));
+  const templateSelect = document.getElementById("daily-template-select");
+  if (templateSelect) templateSelect.addEventListener("change", event => { dailySelectedTemplateId = event.target.value; });
+
+  const dateInput = document.getElementById("daily-record-date");
+  dateInput.addEventListener("change", event => { if (!event.target.value) return; dailyRecordDate = event.target.value; dailyEntryFormState = null; renderDailyRecord(content); });
+
+  content.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => {
+    const action = button.dataset.action;
+    if (action === "open-daily-record") { dailyRecordOpen = true; renderDailyRecord(content); return; }
+    if (action === "toggle-template-panel") { dailyTemplatePanelOpen = !dailyTemplatePanelOpen; renderDailyRecord(content); return; }
+    if (action === "toggle-template-manager") { dailyTemplateManagerOpen = !dailyTemplateManagerOpen; renderDailyRecord(content); return; }
+    if (action === "apply-template") {
+      const id = dailySelectedTemplateId || document.getElementById("daily-template-select")?.value;
+      const template = appData.dailyTemplates.find(item => item.id === id);
+      if (!template) return alert("テンプレートを選択してな。");
+      const target = dailyGetRecord();
+      if (target.entries.length && !confirm("この日の既存の予定をすべて削除して、テンプレートの内容に置き換える？")) return;
+      target.entries = (template.entries || []).map(item => ({ ...item, id: dailyMakeId("activity") }));
+      dailyEntryFormState = null; saveData(); renderDailyRecord(content); return;
+    }
+    if (action === "create-template") { dailyTemplateDraft = { id: "", name: "", entries: [] }; dailyTemplateEntryFormOpen = false; dailyTemplateEntryEditingId = ""; renderDailyRecord(content); return; }
+    if (action === "edit-template") {
+      const template = appData.dailyTemplates.find(item => item.id === button.dataset.templateId);
+      if (!template) return;
+      dailyTemplateDraft = { id: template.id, name: template.name, entries: (template.entries || []).map(item => ({ ...item })) };
+      dailyTemplateEntryFormOpen = false; dailyTemplateEntryEditingId = ""; renderDailyRecord(content); return;
+    }
+    if (action === "delete-template") {
+      const template = appData.dailyTemplates.find(item => item.id === button.dataset.templateId);
+      if (!template || !confirm(`「${template.name}」を削除する？`)) return;
+      appData.dailyTemplates = appData.dailyTemplates.filter(item => item.id !== template.id);
+      if (dailyTemplateDraft?.id === template.id) dailyTemplateDraft = null;
+      saveData(); renderDailyRecord(content); return;
+    }
+    if (action === "add-template-entry") { dailyTemplateEntryFormOpen = true; dailyTemplateEntryEditingId = ""; renderDailyRecord(content); return; }
+    if (action === "edit-template-entry") { dailyTemplateEntryEditingId = button.dataset.entryId; dailyTemplateEntryFormOpen = true; renderDailyRecord(content); return; }
+    if (action === "delete-template-entry") {
+      if (!dailyTemplateDraft) return;
+      dailyTemplateDraft.entries = dailyTemplateDraft.entries.filter(item => item.id !== button.dataset.entryId);
+      renderDailyRecord(content); return;
+    }
+    if (action === "cancel-template-entry") { dailyTemplateEntryFormOpen = false; dailyTemplateEntryEditingId = ""; renderDailyRecord(content); return; }
+    if (action === "save-template") {
+      if (!dailyTemplateDraft) return;
+      const name = document.getElementById("daily-template-name").value.trim();
+      if (!name) return alert("テンプレート名を入力してな。");
+      const duplicate = appData.dailyTemplates.some(item => item.id !== dailyTemplateDraft.id && item.name.toLowerCase() === name.toLowerCase());
+      if (duplicate) return alert("同じ名前のテンプレートがあるで。");
+      dailyTemplateDraft.name = name;
+      if (dailyTemplateDraft.id) {
+        const index = appData.dailyTemplates.findIndex(item => item.id === dailyTemplateDraft.id);
+        if (index >= 0) appData.dailyTemplates[index] = dailyTemplateDraft;
+      } else {
+        dailyTemplateDraft.id = dailyMakeId("template");
+        appData.dailyTemplates.push(dailyTemplateDraft);
+      }
+      dailyTemplateDraft = null; dailyTemplateEntryFormOpen = false; dailyTemplateEntryEditingId = "";
+      saveData(); renderDailyRecord(content); return;
+    }
+    if (action === "open-add-entry") {
+      const start = dailyMinutesToTime(Math.floor((new Date().getHours() * 60 + new Date().getMinutes()) / 5) * 5);
+      dailyEntryFormState = { mode: "add", start }; renderDailyRecord(content);
+      document.getElementById("daily-entry-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
+    }
+    if (action === "edit-entry") {
+      const entry = entries.find(item => item.id === button.dataset.entryId);
+      if (!entry) return;
+      dailyEntryFormState = { mode: "edit", entryId: entry.id, start: dailyMinutesToTime(entry.start) };
+      renderDailyRecord(content); document.getElementById("daily-entry-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); return;
+    }
+    if (action === "close-entry-form") { dailyEntryFormState = null; renderDailyRecord(content); return; }
+    if (action === "delete-current-entry") {
+      if (!dailyEntryFormState?.entryId || !confirm("この予定を削除する？")) return;
+      const target = dailyGetRecord(); target.entries = target.entries.filter(item => item.id !== dailyEntryFormState.entryId);
+      dailyEntryFormState = null; saveData(); renderDailyRecord(content); return;
+    }
+    if (action === "close-template-editor") { dailyTemplateDraft = null; dailyTemplateEntryFormOpen = false; dailyTemplateEntryEditingId = ""; renderDailyRecord(content); return; }
+  }));
+
+  const clock = content.querySelector(".daily-clock");
+  if (clock) clock.addEventListener("click", event => {
+    const rect = clock.getBoundingClientRect();
+    const dx = event.clientX - (rect.left + rect.width / 2);
+    const dy = event.clientY - (rect.top + rect.height / 2);
+    const radius = Math.sqrt(dx * dx + dy * dy);
+    const normalizedRadius = radius / (Math.min(rect.width, rect.height) / 2);
+    if (normalizedRadius < 0.21 || normalizedRadius > 1.02) return;
+    const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+    const minute = Math.floor(angle / 360 * 1440);
+    const hit = entries.find(entry => dailyEntrySegments(entry).some(segment => minute >= segment.start && minute < segment.end));
+    if (hit) dailyEntryFormState = { mode: "edit", entryId: hit.id, start: dailyMinutesToTime(hit.start) };
+    else dailyEntryFormState = { mode: "add", start: dailyMinutesToTime(minute) };
+    renderDailyRecord(content);
+    document.getElementById("daily-entry-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 
-  document.getElementById("daily-template-select").addEventListener("change", event => {
-    dailySelectedTemplateId = event.target.value;
-    renderDailyRecord(document.getElementById("page-content"));
-  });
-
-  document.getElementById("daily-template-apply").addEventListener("click", () => {
-    const template = appData.dailyTemplates.find(item => item.id === dailySelectedTemplateId);
-    if (!template) return;
-    const target = dailyGetRecord();
-    if (target.entries.length && !confirm("この日の予定をテンプレートの内容に置き換える？")) return;
-    target.entries = (template.entries || []).map(entry => ({ ...entry, id: dailyMakeId("activity") }));
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
-  });
-
-  document.getElementById("daily-template-create").addEventListener("click", () => {
-    const name = document.getElementById("daily-template-name").value.trim();
-    if (!name) return alert("テンプレート名を入力してな。");
-    if (!entries.length) return alert("先にこの日の予定を追加してな。");
-    const template = { id: dailyMakeId("template"), name, entries: entries.map(entry => ({ ...entry, id: dailyMakeId("activity") })) };
-    appData.dailyTemplates.push(template);
-    dailySelectedTemplateId = template.id;
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
-  });
-
-  document.getElementById("daily-template-update").addEventListener("click", () => {
-    const template = appData.dailyTemplates.find(item => item.id === dailySelectedTemplateId);
-    if (!template) return;
-    const name = document.getElementById("daily-template-name").value.trim();
-    if (!name) return alert("テンプレート名を入力してな。");
-    if (!entries.length) return alert("更新する予定がありません。");
-    template.name = name;
-    template.entries = entries.map(entry => ({ ...entry, id: dailyMakeId("activity") }));
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
-  });
-
-  document.getElementById("daily-template-delete").addEventListener("click", () => {
-    const template = appData.dailyTemplates.find(item => item.id === dailySelectedTemplateId);
-    if (!template || !confirm(`「${template.name}」を削除する？`)) return;
-    appData.dailyTemplates = appData.dailyTemplates.filter(item => item.id !== dailySelectedTemplateId);
-    dailySelectedTemplateId = "";
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
-  });
-
-  document.getElementById("daily-entry-add-end24").addEventListener("change", event => {
-    document.getElementById("daily-entry-add-end").disabled = event.target.checked;
-  });
-
-  document.getElementById("daily-entry-add-form").addEventListener("submit", event => {
+  const entryForm = document.getElementById("daily-entry-form");
+  if (entryForm) entryForm.addEventListener("submit", event => {
     event.preventDefault();
-    const start = dailyTimeToMinutes(document.getElementById("daily-entry-add-start").value);
-    const end24 = document.getElementById("daily-entry-add-end24").checked;
-    const end = end24 ? 1440 : dailyTimeToMinutes(document.getElementById("daily-entry-add-end").value);
-    const tagId = document.getElementById("daily-entry-add-tag").value;
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("開始時刻と終了時刻は別の時刻にしてな。終了が開始より早い場合は翌日扱いになるで。");
+    const start = dailyTimeToMinutes(document.getElementById("daily-entry-start").value);
+    const end = dailyTimeToMinutes(document.getElementById("daily-entry-end").value, true);
+    const tagId = document.getElementById("daily-entry-tag").value;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("時刻は16:00の形式で入力してな。終了が開始より早い場合は翌日扱いになるで。");
     const candidate = { start, end };
-    if (entries.some(item => dailyEntriesOverlap(candidate, item))) return alert("ほかの予定と時間が重なってるで。時間を調整してな。");
+    if (entries.some(item => item.id !== dailyEntryFormState?.entryId && dailyEntriesOverlap(candidate, item))) return alert("ほかの予定と時間が重なってるで。時間を調整してな。");
+    if (!appData.dailyTags.some(tag => tag.id === tagId)) return alert("タグを選択してな。");
     const snapshot = dailyTagSnapshot(tagId);
-    if (!snapshot.tagId || !appData.dailyTags.some(tag => tag.id === tagId)) return alert("タグを選択してな。");
     const target = dailyGetRecord();
-    target.entries.push({ id: dailyMakeId("activity"), start, end, ...snapshot });
+    if (dailyEntryFormState?.mode === "edit") {
+      target.entries = target.entries.map(item => item.id === dailyEntryFormState.entryId ? { id: item.id, start, end, ...snapshot } : item);
+    } else {
+      target.entries.push({ id: dailyMakeId("activity"), start, end, ...snapshot });
+    }
     target.entries.sort((a, b) => a.start - b.start);
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
+    dailyEntryFormState = null; saveData(); renderDailyRecord(content);
   });
 
-  content.querySelectorAll(".daily-entry-row [data-action='save-entry']").forEach(button => button.addEventListener("click", () => {
-    const row = button.closest(".daily-entry-row");
-    const id = row.dataset.entryId;
-    const start = dailyTimeToMinutes(row.querySelector(".daily-entry-start").value);
-    const end24 = row.querySelector(".daily-entry-end24").checked;
-    const end = end24 ? 1440 : dailyTimeToMinutes(row.querySelector(".daily-entry-end").value);
-    const tagId = row.querySelector(".daily-entry-tag").value;
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("開始時刻と終了時刻は別の時刻にしてな。終了が開始より早い場合は翌日扱いになるで。");
+  const templateEntryForm = document.getElementById("daily-template-entry-form");
+  if (templateEntryForm) templateEntryForm.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!dailyTemplateDraft) return;
+    const start = dailyTimeToMinutes(document.getElementById("daily-template-entry-start").value);
+    const end = dailyTimeToMinutes(document.getElementById("daily-template-entry-end").value, true);
+    const tagId = document.getElementById("daily-template-entry-tag").value;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end === start) return alert("時刻は16:00の形式で入力してな。終了が開始より早い場合は翌日扱いになるで。");
     const candidate = { start, end };
-    if (entries.some(item => item.id !== id && dailyEntriesOverlap(candidate, item))) return alert("ほかの予定と時間が重なってるで。時間を調整してな。");
-    const snapshot = dailyTagSnapshot(tagId, entries.find(item => item.id === id));
-    const target = dailyGetRecord();
-    target.entries = target.entries.map(item => item.id === id ? { id, start, end, ...snapshot } : item);
-    target.entries.sort((a, b) => a.start - b.start);
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
-  }));
+    if (dailyTemplateDraft.entries.some(item => item.id !== dailyTemplateEntryEditingId && dailyEntriesOverlap(candidate, dailyNormalizeEntry(item)))) return alert("テンプレート内のほかの予定と時間が重なってるで。");
+    if (!appData.dailyTags.some(tag => tag.id === tagId)) return alert("タグを選択してな。");
+    const snapshot = dailyTagSnapshot(tagId);
+    if (dailyTemplateEntryEditingId) {
+      dailyTemplateDraft.entries = dailyTemplateDraft.entries.map(item => item.id === dailyTemplateEntryEditingId ? { id: item.id, start, end, ...snapshot } : item);
+    } else {
+      dailyTemplateDraft.entries.push({ id: dailyMakeId("template_activity"), start, end, ...snapshot });
+    }
+    dailyTemplateDraft.entries.sort((a, b) => a.start - b.start);
+    dailyTemplateEntryFormOpen = false; dailyTemplateEntryEditingId = ""; renderDailyRecord(content);
+  });
 
-  content.querySelectorAll(".daily-entry-row [data-action='delete-entry']").forEach(button => button.addEventListener("click", () => {
-    const row = button.closest(".daily-entry-row");
-    const target = dailyGetRecord();
-    target.entries = target.entries.filter(item => item.id !== row.dataset.entryId);
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
-  }));
-
-  content.querySelectorAll(".daily-entry-end24").forEach(checkbox => checkbox.addEventListener("change", () => {
-    const input = checkbox.closest(".daily-end-control").querySelector("input[type='time']");
-    input.disabled = checkbox.checked;
-  }));
-
-  document.getElementById("daily-record-form").addEventListener("submit", event => {
+  const recordForm = document.getElementById("daily-record-form");
+  recordForm.addEventListener("submit", event => {
     event.preventDefault();
     const target = dailyGetRecord();
     target.wakeTime = document.getElementById("daily-wake-time").value;
     target.sleepTime = document.getElementById("daily-sleep-time").value;
     target.note = document.getElementById("daily-record-note").value.trim();
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
+    saveData(); renderDailyRecord(content);
   });
-
   document.getElementById("daily-record-clear").addEventListener("click", () => clearDailyRecord());
 
   document.getElementById("daily-tag-add-form").addEventListener("submit", event => {
@@ -2831,10 +2895,8 @@ function renderDailyRecord(content) {
     if (!name) return;
     if (appData.dailyTags.some(tag => tag.name.toLowerCase() === name.toLowerCase())) return alert("同じ名前のタグがあるで。");
     appData.dailyTags.push({ id: dailyMakeId("tag"), name, color: dailySafeColor(document.getElementById("daily-tag-new-color").value) });
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
+    saveData(); renderDailyRecord(content);
   });
-
   content.querySelectorAll(".daily-tag-row [data-action='save-tag']").forEach(button => button.addEventListener("click", () => {
     const row = button.closest(".daily-tag-row");
     const tag = appData.dailyTags.find(item => item.id === row.dataset.tagId);
@@ -2842,24 +2904,18 @@ function renderDailyRecord(content) {
     const name = row.querySelector(".daily-tag-edit-name").value.trim();
     if (!name) return alert("タグ名を入力してな。");
     if (appData.dailyTags.some(item => item.id !== tag.id && item.name.toLowerCase() === name.toLowerCase())) return alert("同じ名前のタグがあるで。");
-    tag.name = name;
-    tag.color = dailySafeColor(row.querySelector(".daily-tag-edit-color").value);
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
+    tag.name = name; tag.color = dailySafeColor(row.querySelector(".daily-tag-edit-color").value);
+    saveData(); renderDailyRecord(content);
   }));
-
   content.querySelectorAll(".daily-tag-row [data-action='delete-tag']").forEach(button => button.addEventListener("click", () => {
     const row = button.closest(".daily-tag-row");
     const tag = appData.dailyTags.find(item => item.id === row.dataset.tagId);
-    if (!tag || !confirm(`タグ「${tag.name}」を削除する？\n過去の記録やテンプレートには、登録当時のタグ名と色が残るで。`)) return;
+    if (!tag || !confirm(`タグ「${tag.name}」を削除する？\n過去の記録やテンプレートには登録当時のタグ名と色が残るで。`)) return;
     appData.dailyTags = appData.dailyTags.filter(item => item.id !== tag.id);
-    saveData();
-    renderDailyRecord(document.getElementById("page-content"));
+    saveData(); renderDailyRecord(content);
   }));
-
   content.querySelectorAll("[data-record-date]").forEach(button => button.addEventListener("click", () => {
-    dailyRecordDate = button.dataset.recordDate;
-    renderDailyRecord(document.getElementById("page-content"));
+    dailyRecordDate = button.dataset.recordDate; dailyRecordOpen = true; dailyEntryFormState = null; renderDailyRecord(content);
   }));
 }
 
@@ -2867,7 +2923,5 @@ function clearDailyRecord() {
   if (!appData.dailyRecords || !appData.dailyRecords[dailyRecordDate]) return;
   if (!confirm(`${formatDate(parseDate(dailyRecordDate))}の記録を削除しますか？`)) return;
   delete appData.dailyRecords[dailyRecordDate];
-  saveData();
-  renderDailyRecord(document.getElementById("page-content"));
+  dailyEntryFormState = null; saveData(); renderDailyRecord(document.getElementById("page-content"));
 }
-

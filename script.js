@@ -224,6 +224,7 @@ function normalizeStudyData(value) {
     timetable: {
       weekly: { ...defaults.timetable.weekly, ...(timetable.weekly || {}) },
       changes: Array.isArray(timetable.changes) ? timetable.changes : [],
+      specialDays: Array.isArray(timetable.specialDays) ? timetable.specialDays : [],
       enabled: timetable.enabled !== false
     }
   };

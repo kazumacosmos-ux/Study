@@ -3,7 +3,7 @@ name: Study Notifications
 
 on:
   schedule:
-    - cron: '5 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:

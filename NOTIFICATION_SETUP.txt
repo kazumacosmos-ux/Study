@@ -1,0 +1,29 @@
+Study 通知機能：追加設定メモ
+
+1) GitHub Actions Secrets
+- FIREBASE_SERVICE_ACCOUNT : Firebase Admin SDK サービスアカウントJSON全文
+- VAPID_PUBLIC_KEY : このZIP内 notifications.js の STUDY_VAPID_PUBLIC_KEY と同じ値
+- VAPID_PRIVATE_KEY : ZIPとは別途案内された新しい秘密鍵（GitHub Secretsだけに登録）
+- VAPID_SUBJECT : mailto:実際に連絡を受け取れるメールアドレス
+
+2) Realtime Database ルール
+studyPushSubscriptions/$uid の書き込みを、ログイン中の本人だけに許可する必要があります。既存ルールを丸ごと置き換えず、既存のルール構造にこの条件を統合してください。
+
+例（ルート直下に既存の study ルールも含めて構成する場合の考え方）：
+{
+  "rules": {
+    "study": {
+      "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" }
+    },
+    "studyPushSubscriptions": {
+      "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" }
+    }
+  }
+}
+
+注意：上記は既存ルールの確認・統合用の例です。既存の別データ用ルールがある場合は保持してください。GitHub Actions の Admin SDK は通常のクライアントルールをバイパスします。
+
+3) GitHub Actions の workflow_dispatch を一度実行し、ログで完了を確認してください。
+4) iPhone/iPadはホーム画面に追加したStudyを開き、「この端末で通知を有効にする」を押します。
+
+このZIPにはVAPID秘密鍵を含めていません。秘密鍵は必ずGitHub Secretsにのみ保存してください。

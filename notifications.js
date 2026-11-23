@@ -1,6 +1,6 @@
 // Study 通知設定・Web Push登録
 // 通知設定は既存のStudyデータと一緒にFirebase Realtime Databaseへ同期する。
-const STUDY_VAPID_PUBLIC_KEY = "BCY7pLNdRm0hz8FeBorOGe9cwYs5K2s6ZLIz6lsLkotj4Zztm7yNu9ybjUeEg-JXvST-oUe-Wo0iEZ4W35h-jLw";
+const STUDY_VAPID_PUBLIC_KEY = "BI6VGiGSLRTdlFeNGkahyotG1WL9r_L9JUebgKMJkAmhBA_cgsmXDcoatInYbgLnqDUVAUnX0geYdMd6hm_UNqw";
 
 function defaultNotificationSettings() {
   return {
@@ -155,8 +155,17 @@ async function enableStudyNotifications() {
     await refreshNotificationDeviceStatus();
     alert("この端末の通知登録が完了しました！");
   } catch (error) {
-    console.error("通知登録エラー", error);
-    alert("通知登録に失敗しました。通信状態とFirebaseのデータベースルールを確認してください。");
+    console.error("通知登録エラー:", error && { name: error.name, code: error.code, message: error.message });
+    const detail = error && error.code === "PERMISSION_DENIED"
+      ? "Firebaseのデータベースルールで、このユーザーの通知登録先への書き込みが許可されていません。"
+      : error && error.name === "NotAllowedError"
+        ? "端末またはブラウザで通知が許可されていません。"
+        : error && error.name === "InvalidAccessError"
+          ? "通知用の公開鍵が無効です。最新版のStudyファイルが公開されているか確認してください。"
+          : error && error.message
+            ? `エラー詳細：${error.message}`
+            : "通信状態、ログイン状態、Firebaseの設定を確認してください。";
+    alert(`通知登録に失敗しました。\n${detail}`);
   }
 }
 

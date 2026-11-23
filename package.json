@@ -1,0 +1,11 @@
+{
+  "name": "study-pwa-notifications",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scheduled Web Push notifications for Study PWA",
+  "scripts": { "send-notifications": "node scripts/send-notifications.js" },
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "web-push": "^3.6.7"
+  }
+}

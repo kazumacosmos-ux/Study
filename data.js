@@ -17,6 +17,7 @@ const studyData = {
     { id: "other", name: "その他", color: "#9aa1ad" }
   ],
   dailyTemplates: [],
+  notificationSettings: null,
   timetable: {
     weekly: {
       1: ["", "", "", "", "", "", ""],
@@ -50,6 +51,7 @@ const StudyStorage = {
           dailyRecords: parsed.dailyRecords && typeof parsed.dailyRecords === "object" ? parsed.dailyRecords : {},
           dailyTags: Array.isArray(parsed.dailyTags) ? parsed.dailyTags : JSON.parse(JSON.stringify(studyData.dailyTags)),
           dailyTemplates: Array.isArray(parsed.dailyTemplates) ? parsed.dailyTemplates : [],
+          notificationSettings: parsed.notificationSettings && typeof parsed.notificationSettings === "object" ? parsed.notificationSettings : null,
           timetable: {
             weekly: { ...weeklyDefaults, ...(savedTimetable.weekly || {}) },
             changes: Array.isArray(savedTimetable.changes) ? savedTimetable.changes : [],
@@ -75,6 +77,7 @@ const StudyStorage = {
         dailyRecords: data.dailyRecords || {},
         dailyTags: data.dailyTags || [],
         dailyTemplates: data.dailyTemplates || [],
+        notificationSettings: data.notificationSettings || null,
         timetable: data.timetable || studyData.timetable
       };
       localStorage.setItem("studyData", JSON.stringify(cleanData));

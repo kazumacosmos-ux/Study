@@ -29,7 +29,8 @@ const pageNames = {
   tasks: "課題管理",
   todo: "TODO",
   timetable: "時間割",
-  dailyRecord: "1日の記録"
+  dailyRecord: "1日の記録",
+  notifications: "通知設定"
 };
 
 let currentPage = "home";
@@ -226,6 +227,7 @@ function normalizeStudyData(value) {
     dailyRecords: source.dailyRecords && typeof source.dailyRecords === "object" ? source.dailyRecords : {},
     dailyTags: Array.isArray(source.dailyTags) ? source.dailyTags : defaults.dailyTags,
     dailyTemplates: Array.isArray(source.dailyTemplates) ? source.dailyTemplates : [],
+    notificationSettings: source.notificationSettings && typeof source.notificationSettings === "object" ? source.notificationSettings : null,
     timetable: {
       weekly: { ...defaults.timetable.weekly, ...(timetable.weekly || {}) },
       changes: Array.isArray(timetable.changes) ? timetable.changes : [],
@@ -415,6 +417,9 @@ function showPage(page) {
       break;
     case "dailyRecord":
       renderDailyRecord(content);
+      break;
+    case "notifications":
+      renderNotifications(content);
       break;
   }
 }

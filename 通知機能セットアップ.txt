@@ -50,7 +50,7 @@ ZIP内のファイルをStudyリポジトリの同じ階層へ配置してくだ
 既存ファイルはこのZIP内の更新版で置き換えます。追加ファイルは次のとおりです。
 - notifications.js
 - package.json
-- scripts/send-notifications.js
+- send-notifications.js
 - .github/workflows/study-notifications.yml
 
 GitHub ActionsのWorkflowが有効になっていることを確認してください。

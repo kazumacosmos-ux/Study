@@ -5,6 +5,7 @@ const STUDY_VAPID_PUBLIC_KEY = "BI6VGiGSLRTdlFeNGkahyotG1WL9r_L9JUebgKMJkAmhBA_c
 function defaultNotificationSettings() {
   return {
     enabled: false,
+    selectedTypes: ["timetable", "events", "tasks"],
     dailyTime: "06:00",
     daily: { timetable: true, events: true, tasks: true },
     taskReminderDays: [7, 6, 5, 4, 3, 2, 1, 0],
@@ -25,6 +26,9 @@ function normalizeNotificationSettings(value) {
     ...source,
     dailyTime: /^([01]\d|2[0-3]):00$/.test(source.dailyTime || "") ? source.dailyTime : defaults.dailyTime,
     daily: { ...defaults.daily, ...(source.daily || {}) },
+    selectedTypes: Array.isArray(source.selectedTypes)
+      ? [...new Set(source.selectedTypes.filter(key => ["timetable", "events", "tasks", "taskReminder"].includes(key)))]
+      : ["timetable", "events", "tasks", ...(Array.isArray(source.taskReminderDays) && source.taskReminderDays.length ? ["taskReminder"] : [])],
     taskReminderDays: Array.isArray(source.taskReminderDays)
       ? source.taskReminderDays.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 7)
       : defaults.taskReminderDays,
@@ -38,15 +42,21 @@ function renderNotifications(content) {
   const settings = normalizeNotificationSettings(appData.notificationSettings);
   appData.notificationSettings = settings;
   const days = [7, 6, 5, 4, 3, 2, 1, 0];
-  const dailyLabels = { timetable: "今日の時間割", events: "今日の予定", tasks: "今日提出の課題" };
+  const typeLabels = {
+    timetable: "時間割",
+    events: "今日の予定",
+    tasks: "今日提出の課題",
+    taskReminder: "今後提出の課題"
+  };
   const messageFields = [
-    ["timetable", "今日の時間割"], ["events", "今日の予定"],
-    ["tasks", "今日提出の課題"], ["taskReminder", "これからの課題"]
+    ["timetable", "時間割"], ["events", "今日の予定"],
+    ["tasks", "今日提出の課題"], ["taskReminder", "今後提出の課題"]
   ];
+  const available = Object.keys(typeLabels).filter(key => !settings.selectedTypes.includes(key));
   content.innerHTML = `
     <div class="card notification-settings-card">
       <h2 class="card-title">通知設定</h2>
-      <p class="muted">通知を受け取る端末ごとに、ホーム画面へ追加したStudyで通知を許可してください。設定はアカウントに同期されます。</p>
+      <p class="muted">受け取りたい通知を選んで追加できます。設定はアカウントに同期されます。</p>
       <div class="notification-permission-row">
         <div><strong>この端末の通知</strong><div id="notification-device-status" class="muted">確認中…</div></div>
         <button type="button" class="primary-button" id="notification-enable-button">この端末で通知を有効にする</button>
@@ -56,29 +66,42 @@ function renderNotifications(content) {
         <label class="notification-switch"><input type="checkbox" id="notification-master" ${settings.enabled ? "checked" : ""}><span>ON</span></label>
       </div>
       <div class="notification-setting-block">
-        <h3>毎日の通知</h3>
-        <label class="notification-time-label">通知時刻 <input type="time" id="notification-daily-time" value="${escapeHTML(settings.dailyTime)}" step="3600"></label>
-        <p class="muted small-note">時刻は日本時間・1時間単位です。通常は設定した時刻の約7分後に確認・配信します。GitHub側の実行遅延により、さらに遅れる場合があります。</p>
-        ${Object.entries(dailyLabels).map(([key, label]) => `
-          <label class="notification-check-row"><input type="checkbox" data-daily-key="${key}" ${settings.daily[key] ? "checked" : ""}><span>${label}</span></label>
-        `).join("")}
+        <h3>受け取る通知</h3>
+        <div id="notification-selected-list">
+          ${settings.selectedTypes.map(key => `
+            <div class="notification-selected-item">
+              <label class="notification-check-row"><input type="checkbox" data-type-enabled="${key}" checked><span>${typeLabels[key]}</span></label>
+              <button type="button" class="notification-remove-button" data-remove-type="${key}" aria-label="${typeLabels[key]}を一覧から削除">削除</button>
+            </div>`).join("") || '<p class="muted">通知はまだ追加されていません。</p>'}
+        </div>
+        <div class="notification-add-row">
+          <select id="notification-add-select" aria-label="追加する通知の種類">
+            <option value="">追加する通知を選択</option>
+            ${available.map(key => `<option value="${key}">${typeLabels[key]}</option>`).join("")}
+          </select>
+          <button type="button" class="secondary-button" id="notification-add-button" ${available.length ? "" : "disabled"}>＋ 通知を追加</button>
+        </div>
       </div>
       <div class="notification-setting-block">
-        <h3>これからの課題</h3>
-        <p class="muted">提出期限の何日前に通知するか、日ごとに設定できます。</p>
+        <h3>通知時刻</h3>
+        <label class="notification-time-label">毎日の通知時刻 <input type="time" id="notification-daily-time" value="${escapeHTML(settings.dailyTime)}" step="3600"></label>
+        <p class="muted small-note">日本時間・1時間単位です。通常は設定時刻の約7分後に確認・配信します。</p>
+      </div>
+      <div class="notification-setting-block" id="notification-reminder-settings" ${settings.selectedTypes.includes("taskReminder") ? "" : "hidden"}>
+        <h3>今後提出の課題の通知タイミング</h3>
+        <p class="muted">提出期限の何日前に通知するか選べます。</p>
         <div class="notification-days-grid">
           ${days.map(day => `<label><input type="checkbox" data-reminder-day="${day}" ${settings.taskReminderDays.includes(day) ? "checked" : ""}><span>${day === 0 ? "当日" : `${day}日前`}</span></label>`).join("")}
         </div>
       </div>
       <div class="notification-setting-block">
         <h3>通知内容</h3>
-        ${messageFields.map(([key, label]) => `
+        ${messageFields.filter(([key]) => settings.selectedTypes.includes(key)).map(([key, label]) => `
           <div class="notification-message-editor">
             <strong>${label}</strong>
             <label>タイトル<input type="text" maxlength="80" data-message-key="${key}" data-message-field="title" value="${escapeHTML(settings.messages[key].title)}"></label>
             <label>本文<input type="text" maxlength="180" data-message-key="${key}" data-message-field="body" value="${escapeHTML(settings.messages[key].body)}"></label>
-          </div>
-        `).join("")}
+          </div>`).join("")}
       </div>
       <div class="notification-save-row"><button type="button" class="primary-button" id="notification-save-button">通知設定を保存</button><span id="notification-save-status" class="muted" aria-live="polite"></span></div>
     </div>`;
@@ -86,8 +109,24 @@ function renderNotifications(content) {
   refreshNotificationDeviceStatus();
   document.getElementById("notification-enable-button").addEventListener("click", enableStudyNotifications);
   document.getElementById("notification-save-button").addEventListener("click", saveNotificationSettings);
+  document.getElementById("notification-add-button").addEventListener("click", () => {
+    const select = document.getElementById("notification-add-select");
+    if (!select.value) return;
+    const next = normalizeNotificationSettings(appData.notificationSettings);
+    if (!next.selectedTypes.includes(select.value)) next.selectedTypes.push(select.value);
+    appData.notificationSettings = next;
+    renderNotifications(content);
+  });
+  document.querySelectorAll("[data-remove-type]").forEach(button => button.addEventListener("click", () => {
+    const next = normalizeNotificationSettings(appData.notificationSettings);
+    next.selectedTypes = next.selectedTypes.filter(key => key !== button.dataset.removeType);
+    appData.notificationSettings = next;
+    renderNotifications(content);
+  }));
+  document.querySelectorAll("[data-type-enabled]").forEach(input => input.addEventListener("change", () => {
+    // 一覧のチェックは「この種類を受け取る」状態。保存時に反映する。
+  }));
 }
-
 async function refreshNotificationDeviceStatus() {
   const status = document.getElementById("notification-device-status");
   if (!status) return;
@@ -174,9 +213,10 @@ function saveNotificationSettings() {
   settings.enabled = document.getElementById("notification-master").checked;
   settings.dailyTime = document.getElementById("notification-daily-time").value || "06:00";
   if (!/^([01]\d|2[0-3]):00$/.test(settings.dailyTime)) { alert("通知時刻は1時間単位で設定してください。"); return; }
-  document.querySelectorAll("[data-daily-key]").forEach(input => {
-    settings.daily[input.dataset.dailyKey] = input.checked;
-  });
+  settings.selectedTypes = Array.from(document.querySelectorAll("[data-type-enabled]:checked")).map(input => input.dataset.typeEnabled);
+  settings.daily.timetable = settings.selectedTypes.includes("timetable");
+  settings.daily.events = settings.selectedTypes.includes("events");
+  settings.daily.tasks = settings.selectedTypes.includes("tasks");
   settings.taskReminderDays = Array.from(document.querySelectorAll("[data-reminder-day]:checked"))
     .map(input => Number(input.dataset.reminderDay)).sort((a, b) => b - a);
   document.querySelectorAll("[data-message-key]").forEach(input => {

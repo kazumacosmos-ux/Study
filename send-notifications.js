@@ -108,32 +108,35 @@ async function main() {
     if (!Object.keys(subscriptions).length) continue;
     const messages = settings.messages || {};
     const daily = settings.daily || {};
+    const selectedTypes = Array.isArray(settings.selectedTypes)
+      ? settings.selectedTypes
+      : [ ...(daily.timetable ? ['timetable'] : []), ...(daily.events ? ['events'] : []), ...(daily.tasks ? ['tasks'] : []), ...((Array.isArray(settings.taskReminderDays) && settings.taskReminderDays.length) ? ['taskReminder'] : []) ];
     const makeMessage = (key, defaultTitle, defaultBody) => ({
       title: cleanText(messages[key] && messages[key].title, defaultTitle),
       body: cleanText(messages[key] && messages[key].body, defaultBody)
     });
 
-    if (daily.timetable) {
+    if (selectedTypes.includes('timetable') && daily.timetable) {
       const subjects = timetableForToday(data.timetable, today);
       const msg = makeMessage('timetable', '今日の時間割', '今日の授業を確認しましょう。');
       const body = subjects.length ? `${msg.body}\n${subjects.join('・')}` : `${msg.body}\n登録されている授業はありません。`;
       await sendToUser(uid, subscriptions, 'daily_timetable', msg.title, body, today); sentCount++;
     }
-    if (daily.events) {
+    if (selectedTypes.includes('events') && daily.events) {
       const events = (Array.isArray(data.events) ? data.events : []).filter(event => eventIsToday(event, today));
       const msg = makeMessage('events', '今日の予定', '今日の予定を確認しましょう。');
       const details = events.map(e => `${e.title || '予定'}${e.allDay ? '' : (e.startTime ? ` ${e.startTime}` : '')}`);
       await sendToUser(uid, subscriptions, 'daily_events', msg.title, details.length ? `${msg.body}\n${details.join('・')}` : `${msg.body}\n登録されている予定はありません。`, today); sentCount++;
     }
     const tasks = (Array.isArray(data.tasks) ? data.tasks : []).filter(t => t.status !== 'completed' && t.dueDate);
-    if (daily.tasks) {
+    if (selectedTypes.includes('tasks') && daily.tasks) {
       const due = tasks.filter(t => t.dueDate === today);
       const msg = makeMessage('tasks', '今日提出の課題', '今日が提出期限の課題があります。');
       const details = due.map(t => `${t.subject || ''} ${t.title || t.range || '課題'}`.trim());
       await sendToUser(uid, subscriptions, 'daily_tasks', msg.title, details.length ? `${msg.body}\n${details.join('・')}` : `${msg.body}\n今日提出の課題はありません。`, today); sentCount++;
     }
     const reminderDays = Array.isArray(settings.taskReminderDays) ? settings.taskReminderDays.map(Number) : [7,6,5,4,3,2,1,0];
-    if (reminderDays.length) {
+    if (selectedTypes.includes('taskReminder') && reminderDays.length) {
       for (const task of tasks) {
         const remaining = daysBetween(today, task.dueDate);
         if (!reminderDays.includes(remaining) || remaining < 0 || remaining > 7) continue;

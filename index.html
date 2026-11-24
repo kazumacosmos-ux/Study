@@ -12,6 +12,91 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <title>Study | 学習管理</title>
+  <!-- 起動画面の最小スタイルはHTML内に置き、外部CSSの読み込み前から白画面を防ぐ -->
+  <style>
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #f5f7fb;
+    }
+    body {
+      background: #f5f7fb;
+    }
+    #startup-screen.startup-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 43%, rgba(226, 230, 255, 0.72), transparent 31%),
+        linear-gradient(145deg, #fbfcff 0%, #f2f4fc 52%, #f8f9ff 100%);
+      opacity: 1;
+      visibility: visible;
+    }
+    #startup-screen .startup-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translateY(-5px);
+      animation: startup-content-in 0.8s cubic-bezier(.2,.75,.25,1) both;
+    }
+    #startup-screen .startup-logo {
+      color: #202944;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: clamp(48px, 12vw, 66px);
+      line-height: 1;
+      font-weight: 850;
+      letter-spacing: -3.5px;
+    }
+    #startup-screen .startup-logo span { color: #7887ed; }
+    #startup-screen .startup-caption {
+      margin-top: 13px;
+      color: #929bb5;
+      font: 750 9px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 3px;
+    }
+    #startup-screen .startup-loader {
+      position: relative;
+      width: 142px;
+      height: 3px;
+      margin-top: 43px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(111, 126, 205, 0.13);
+    }
+    #startup-screen .startup-loader span {
+      position: absolute;
+      top: 0;
+      left: -38%;
+      width: 38%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #9aa7f4, #5969d9);
+      animation: startup-loading 1.35s ease-in-out infinite;
+    }
+    #startup-screen .startup-message {
+      margin-top: 13px;
+      color: #929bb5;
+      font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 1.5px;
+    }
+    @keyframes startup-content-in {
+      from { opacity: 0; transform: translateY(12px) scale(.97); }
+      to { opacity: 1; transform: translateY(-5px) scale(1); }
+    }
+    @keyframes startup-loading {
+      0% { left: -38%; }
+      100% { left: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #startup-screen .startup-content,
+      #startup-screen .startup-loader span { animation: none !important; }
+    }
+  </style>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>

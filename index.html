@@ -15,6 +15,19 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="startup-screen" class="startup-screen" role="status" aria-label="Studyを読み込み中">
+    <div class="startup-orbit startup-orbit-one" aria-hidden="true"></div>
+    <div class="startup-orbit startup-orbit-two" aria-hidden="true"></div>
+    <span class="startup-spark startup-spark-one" aria-hidden="true"></span>
+    <span class="startup-spark startup-spark-two" aria-hidden="true"></span>
+    <span class="startup-spark startup-spark-three" aria-hidden="true"></span>
+    <div class="startup-content">
+      <div class="startup-logo">Study<span>.</span></div>
+      <div class="startup-caption">PERSONAL LEARNING SPACE</div>
+      <div class="startup-loader" aria-hidden="true"><span></span></div>
+      <div class="startup-message">準備しています</div>
+    </div>
+  </div>
   <section id="auth-screen" class="auth-screen" hidden></section>
   <div id="app" hidden>
     <aside class="sidebar">

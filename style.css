@@ -2476,3 +2476,181 @@ textarea:focus {
 .notification-schedule-controls input,.notification-add-row select{padding:9px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--card)}
 .notification-add-row{justify-content:flex-start;margin-top:14px}
 .notification-add-row select{min-width:190px}
+
+
+/* ======================================
+   Study 起動画面
+   ====================================== */
+
+.startup-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 43%, rgba(226, 230, 255, 0.72), transparent 31%),
+    linear-gradient(145deg, #fbfcff 0%, #f2f4fc 52%, #f8f9ff 100%);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.42s ease, visibility 0.42s ease;
+}
+
+.startup-screen.is-leaving {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.startup-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-5px);
+  animation: startup-content-in 0.8s cubic-bezier(.2,.75,.25,1) both;
+}
+
+.startup-logo {
+  color: #202944;
+  font-size: clamp(48px, 12vw, 66px);
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: -3.5px;
+  text-shadow: 0 8px 28px rgba(55, 70, 130, 0.08);
+  animation: startup-logo-float 3s ease-in-out 0.8s infinite;
+}
+
+.startup-logo span {
+  color: #7887ed;
+}
+
+.startup-caption {
+  margin-top: 13px;
+  color: #929bb5;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 3px;
+}
+
+.startup-loader {
+  position: relative;
+  width: 142px;
+  height: 3px;
+  margin-top: 43px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(111, 126, 205, 0.13);
+}
+
+.startup-loader span {
+  position: absolute;
+  top: 0;
+  left: -38%;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #9aa7f4, #5969d9);
+  animation: startup-loading 1.35s ease-in-out infinite;
+}
+
+.startup-message {
+  margin-top: 13px;
+  color: #929bb5;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+.startup-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(76vw, 330px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(123, 137, 218, 0.12);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.startup-orbit-one {
+  animation: startup-orbit-pulse 4.2s ease-in-out infinite;
+}
+
+.startup-orbit-two {
+  width: min(94vw, 410px);
+  border-color: rgba(123, 137, 218, 0.075);
+  animation: startup-orbit-pulse 4.2s ease-in-out 1.1s infinite;
+}
+
+.startup-spark {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #aab5ff;
+  box-shadow: 0 0 15px rgba(120, 136, 230, 0.45);
+  animation: startup-sparkle 2.6s ease-in-out infinite;
+}
+
+.startup-spark-one {
+  top: 34%;
+  left: calc(50% - 116px);
+}
+
+.startup-spark-two {
+  top: 59%;
+  left: calc(50% + 128px);
+  width: 5px;
+  height: 5px;
+  animation-delay: 0.8s;
+}
+
+.startup-spark-three {
+  top: 66%;
+  left: calc(50% - 91px);
+  width: 4px;
+  height: 4px;
+  animation-delay: 1.5s;
+}
+
+@keyframes startup-content-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(-5px) scale(1); }
+}
+
+@keyframes startup-logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes startup-loading {
+  0% { left: -38%; }
+  100% { left: 100%; }
+}
+
+@keyframes startup-orbit-pulse {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(0.97); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.03); }
+}
+
+@keyframes startup-sparkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.65) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.2) rotate(45deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-content,
+  .startup-logo,
+  .startup-loader span,
+  .startup-orbit,
+  .startup-spark {
+    animation: none !important;
+  }
+
+  .startup-screen {
+    transition-duration: 0.01ms;
+  }
+}

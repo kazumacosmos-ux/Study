@@ -59,6 +59,24 @@ let dailyRecordDate = todayString();
 // 初期化
 // --------------------------------------
 
+let startupScreenStartedAt = Date.now();
+let startupScreenFinished = false;
+
+function finishStartupScreen() {
+  if (startupScreenFinished) return;
+  startupScreenFinished = true;
+
+  const splash = document.getElementById("startup-screen");
+  if (!splash) return;
+
+  // 起動直後に一瞬で消えないよう、最低限の表示時間を確保する
+  const remaining = Math.max(0, 750 - (Date.now() - startupScreenStartedAt));
+  window.setTimeout(() => {
+    splash.classList.add("is-leaving");
+    window.setTimeout(() => splash.remove(), 480);
+  }, remaining);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("today-label").textContent = formatDate(new Date());
 
@@ -75,6 +93,12 @@ document.addEventListener("DOMContentLoaded", () => {
   setupZoomPrevention();
   setupCalendarStyles();
   setupFirebaseSync();
+
+  // 認証状態の確認が長引いた場合も、接続待ちで画面が固まったままにしない
+  window.setTimeout(() => {
+    if (startupScreenFinished) return;
+    renderAuthScreen("接続に時間がかかっています。通信状態を確認してください。");
+  }, 12000);
 });
 
 // --------------------------------------
@@ -112,6 +136,7 @@ function renderAuthScreen(message = "") {
   const screen = document.getElementById("auth-screen");
   document.getElementById("app").hidden = true;
   screen.hidden = false;
+  finishStartupScreen();
   screen.innerHTML = `
     <div class="auth-card">
       <div class="auth-logo">Study<span>.</span></div>
@@ -204,10 +229,12 @@ function setupFirebaseSync() {
           showSyncNotice("同期の受信に失敗しました。Firebaseのルールを確認してください。");
         });
         showPage("home");
+        finishStartupScreen();
       } catch (error) {
         console.error("Studyデータの同期準備に失敗しました", error);
         showSyncNotice("データを読み込めませんでした。Firebaseのルールと通信状態を確認してください。");
         showPage("home");
+        finishStartupScreen();
       }
     });
   } catch (error) {

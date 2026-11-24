@@ -12,46 +12,26 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <title>Study | 学習管理</title>
-  <!-- 起動直後の白画面を避けるための最小スタイル。外部CSSより先に適用する -->
   <style>
+    /* 起動画面の最小表示は外部CSSを待たずに描画する */
     html, body { margin: 0; min-height: 100%; background: #f5f7fb; }
-    body { min-height: 100vh; }
     #startup-screen {
       position: fixed; inset: 0; z-index: 10000;
       display: grid; place-items: center; overflow: hidden;
       background: radial-gradient(circle at 50% 43%, rgba(226,230,255,.72), transparent 31%),
-                  linear-gradient(145deg,#fbfcff 0%,#f2f4fc 52%,#f8f9ff 100%);
-      color: #202944; opacity: 1; visibility: visible;
+                  linear-gradient(145deg, #fbfcff 0%, #f2f4fc 52%, #f8f9ff 100%);
+      color: #202944;
     }
-    #startup-screen .startup-content {
-      position: relative; z-index: 2; display: flex;
-      flex-direction: column; align-items: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-    }
-    #startup-screen .startup-logo {
-      font-size: clamp(48px,12vw,66px); line-height: 1;
-      font-weight: 850; letter-spacing: -3.5px;
-    }
-    #startup-screen .startup-logo span { color: #7887ed; }
-    #startup-screen .startup-caption, #startup-screen .startup-message {
-      color: #929bb5; font-size: 10px; letter-spacing: 2px;
-    }
-    #startup-screen .startup-caption { margin-top: 13px; font-weight: 750; }
-    #startup-screen .startup-loader {
-      width: 142px; height: 3px; margin-top: 43px;
-      overflow: hidden; border-radius: 999px; background: rgba(111,126,205,.13);
-    }
-    #startup-screen .startup-loader span {
-      display: block; width: 38%; height: 100%; border-radius: inherit;
-      background: linear-gradient(90deg,#9aa7f4,#5969d9);
-      animation: startup-critical-loading 1.35s ease-in-out infinite alternate;
-    }
-    #startup-screen .startup-message { margin-top: 13px; letter-spacing: 1.5px; }
-    @keyframes startup-critical-loading { from { transform: translateX(0); } to { transform: translateX(164px); } }
-    #startup-screen.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .42s ease, visibility .42s ease; }
-    @media (prefers-reduced-motion: reduce) { #startup-screen .startup-loader span { animation: none; } }
+    #startup-screen .startup-content { display:flex; flex-direction:column; align-items:center; }
+    #startup-screen .startup-logo { font: 850 58px/1 system-ui,-apple-system,sans-serif; letter-spacing:-3.5px; }
+    #startup-screen .startup-logo span { color:#7887ed; }
+    #startup-screen .startup-caption { margin-top:12px; font:600 10px/1.5 system-ui,sans-serif; letter-spacing:3px; color:#8790ad; }
+    #startup-screen .startup-loader { width:112px; height:3px; margin-top:30px; overflow:hidden; border-radius:99px; background:#e2e6f5; }
+    #startup-screen .startup-loader span { display:block; width:42%; height:100%; border-radius:99px; background:#7887ed; animation:startup-critical-load 1.25s ease-in-out infinite; }
+    #startup-screen .startup-message { margin-top:13px; color:#929ab2; font:500 11px/1.5 system-ui,sans-serif; }
+    @keyframes startup-critical-load { 0% { transform:translateX(-110%); } 100% { transform:translateX(270%); } }
+    @media (prefers-reduced-motion: reduce) { #startup-screen .startup-loader span { animation:none; } }
   </style>
-  <!-- 本体CSSは非同期で読み込み、最初の描画をブロックしない -->
   <link rel="preload" href="style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="style.css"></noscript>
 </head>
@@ -100,12 +80,12 @@
     </main>
   </div>
 
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-  <script src="data.js"></script>
-  <script src="script.js"></script>
-  <script src="notifications.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script defer src="data.js"></script>
+  <script defer src="script.js"></script>
+  <script defer src="notifications.js"></script>
   <script>
     // PWA用Service Workerの登録（オフラインキャッシュは使用しない）
     if ("serviceWorker" in navigator) {

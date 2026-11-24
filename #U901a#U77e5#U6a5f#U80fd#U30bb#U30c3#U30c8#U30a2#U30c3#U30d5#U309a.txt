@@ -1,0 +1,77 @@
+Study 通知機能 セットアップ手順
+================================
+
+このZIPには、Study本体への通知設定画面追加、Service WorkerのWeb Push受信処理、GitHub Actionsの定期送信プログラムが含まれます。
+
+重要：GitHub/Firebase側の秘密情報登録が終わるまでは、実際のプッシュ通知は送信されません。Firebaseの有料プランへの変更は不要な構成です（Cloud Messagingは無料、送信処理はGitHub Actions上で実行）。
+
+1. Firebaseでサービスアカウントキーを作る
+----------------------------------------
+1) Firebase Consoleでプロジェクト「study-ecd4a」を開く。
+2) プロジェクトの設定 → サービス アカウントを開く。
+3) 「新しい秘密鍵を生成」でJSONファイルをダウンロードする。
+4) このJSONファイルは絶対にGitHubのリポジトリへアップロードしない。
+
+2. GitHub Secretsを登録する
+---------------------------
+GitHubのStudyリポジトリ → Settings → Secrets and variables → Actions → New repository secret で、次の4つを必須登録する。
+
+FIREBASE_SERVICE_ACCOUNT
+  値：手順1でダウンロードしたJSONファイルの中身を最初から最後まで貼り付ける。
+
+VAPID_PUBLIC_KEY
+  値：BCY7pLNdRm0hz8FeBorOGe9cwYs5K2s6ZLIz6lsLkotj4Zztm7yNu9ybjUeEg-JXvST-oUe-Wo0iEZ4W35h-jLw
+
+VAPID_PRIVATE_KEY
+  値：別途案内する秘密鍵を登録する。公開リポジトリやコードへ書かない。
+
+VAPID_SUBJECT
+  値：mailto:自分が受信できるメールアドレス
+
+※FIREBASE_DATABASE_URLはWorkflowに直接設定済みです。
+
+3. Realtime Databaseルールを確認する
+-----------------------------------
+アプリからログインユーザー自身の通知購読情報を保存できる必要があります。既存ルールを確認してから、以下のパスに対して本人だけ読み書きできるルールを追加してください。
+
+"studyPushSubscriptions": {
+  "$uid": {
+    ".read": "auth != null && auth.uid === $uid",
+    ".write": "auth != null && auth.uid === $uid"
+  }
+}
+
+既存のルール全体を置き換えないでください。現在のStudyデータ用ルールを残したまま、このルールを統合してください。
+GitHub ActionsはFirebase Admin SDKのサービスアカウントで読み書きするため、クライアント向けルールの影響を受けません。
+
+4. GitHubへファイルを反映
+-------------------------
+ZIP内のファイルをStudyリポジトリの同じ階層へ配置してください。
+既存ファイルはこのZIP内の更新版で置き換えます。追加ファイルは次のとおりです。
+- notifications.js
+- package.json
+- scripts/send-notifications.js
+- .github/workflows/study-notifications.yml
+
+GitHub ActionsのWorkflowが有効になっていることを確認してください。
+
+5. 端末で通知登録
+-----------------
+1) GitHub PagesのStudyをHTTPSで開く。
+2) iPhone/iPadはStudyをホーム画面に追加する。
+3) ホーム画面のStudyアイコンから起動してログインする。
+4) 「通知設定」を開き、「この端末で通知を有効にする」を押す。
+5) iOSの通知許可を「許可」にする。
+6) 通知全体をONにし、時刻・通知種類・課題リマインド日数・文面を設定して保存する。
+7) iPadとiPhoneの両方で受け取りたい場合は、それぞれの端末で通知登録を行う。
+
+仕様・注意
+----------
+- iOS/iPadOSのWeb Pushは、iOS/iPadOS 16.4以降のホーム画面Webアプリが対象です。Safariのタブで開いただけではなく、ホーム画面から起動して許可してください。
+- 通知時刻は日本時間・5分単位です。GitHub Actionsは5分ごとに確認し、設定した時間帯に通知します（通常は設定時刻の数分後）。GitHubの実行遅延によりさらに遅れる場合があります。毎時1回の実行に抑え、プライベートリポジトリでも無料枠を使い切りにくい構成にしています。
+- GitHub Actionsの定時実行はGitHub側の都合で遅延・停止する場合があり、厳密な時刻保証はありません。
+- 「今日の時間割」「今日の予定」「今日提出の課題」は毎日1回の通知です。時間割は登録されている教科名を本文に含めます。
+- 課題リマインドは提出期限の7日前〜当日を個別に判定します。完了済み課題は通知しません。
+- 通知は端末ごとに登録が必要です。アカウントの通知設定は同期されます。
+- Firebase Realtime Databaseの既存ルール・データ構造を壊さないよう、ルールは追記統合してください。
+- GitHub ActionsのWorkflowはデフォルトブランチに存在している必要があります。

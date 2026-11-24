@@ -12,31 +12,46 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <title>Study | 学習管理</title>
+  <!-- 起動直後の白画面を避けるための最小スタイル。外部CSSより先に適用する -->
   <style>
-    /* 最初の描画用：外部CSSを待たずに起動画面を表示 */
-    html, body { width:100%; min-height:100%; margin:0; background:#f5f7fb; }
-    body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif; }
+    html, body { margin: 0; min-height: 100%; background: #f5f7fb; }
+    body { min-height: 100vh; }
     #startup-screen {
-      position:fixed; inset:0; z-index:10000; display:grid; place-items:center;
-      overflow:hidden; background:radial-gradient(circle at 50% 43%,rgba(226,230,255,.72),transparent 31%),
-      linear-gradient(145deg,#fbfcff 0%,#f2f4fc 52%,#f8f9ff 100%);
-      opacity:1; visibility:visible;
+      position: fixed; inset: 0; z-index: 10000;
+      display: grid; place-items: center; overflow: hidden;
+      background: radial-gradient(circle at 50% 43%, rgba(226,230,255,.72), transparent 31%),
+                  linear-gradient(145deg,#fbfcff 0%,#f2f4fc 52%,#f8f9ff 100%);
+      color: #202944; opacity: 1; visibility: visible;
     }
-    #startup-screen .startup-content { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; }
-    #startup-screen .startup-logo { color:#202944; font-size:clamp(48px,12vw,66px); line-height:1; font-weight:850; letter-spacing:-3.5px; }
-    #startup-screen .startup-logo span { color:#7887ed; }
-    #startup-screen .startup-caption { margin-top:13px; color:#929bb5; font-size:9px; font-weight:750; letter-spacing:3px; }
-    #startup-screen .startup-loader { position:relative; width:142px; height:3px; margin-top:43px; overflow:hidden; border-radius:999px; background:rgba(111,126,205,.13); }
-    #startup-screen .startup-loader span { position:absolute; top:0; left:-38%; width:38%; height:100%; border-radius:inherit; background:linear-gradient(90deg,#9aa7f4,#5969d9); animation:startup-loading 1.35s ease-in-out infinite; }
-    #startup-screen .startup-message { margin-top:13px; color:#929bb5; font-size:11px; letter-spacing:1.5px; }
-    #startup-screen .startup-orbit { position:absolute; left:50%; top:50%; width:min(76vw,330px); aspect-ratio:1; border:1px solid rgba(123,137,218,.12); border-radius:50%; transform:translate(-50%,-50%); }
-    #startup-screen .startup-orbit-two { width:min(94vw,410px); border-color:rgba(123,137,218,.075); }
-    #startup-screen .startup-spark { position:absolute; width:7px; height:7px; border-radius:2px; background:#aab5ff; box-shadow:0 0 15px rgba(120,136,230,.45); }
-    #startup-screen .startup-spark-one { top:34%; left:calc(50% - 116px); }
-    #startup-screen .startup-spark-two { top:59%; left:calc(50% + 128px); width:5px; height:5px; }
-    #startup-screen .startup-spark-three { top:66%; left:calc(50% - 91px); width:4px; height:4px; }
-    @keyframes startup-loading { 0%{left:-38%} 100%{left:100%} }
+    #startup-screen .startup-content {
+      position: relative; z-index: 2; display: flex;
+      flex-direction: column; align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    }
+    #startup-screen .startup-logo {
+      font-size: clamp(48px,12vw,66px); line-height: 1;
+      font-weight: 850; letter-spacing: -3.5px;
+    }
+    #startup-screen .startup-logo span { color: #7887ed; }
+    #startup-screen .startup-caption, #startup-screen .startup-message {
+      color: #929bb5; font-size: 10px; letter-spacing: 2px;
+    }
+    #startup-screen .startup-caption { margin-top: 13px; font-weight: 750; }
+    #startup-screen .startup-loader {
+      width: 142px; height: 3px; margin-top: 43px;
+      overflow: hidden; border-radius: 999px; background: rgba(111,126,205,.13);
+    }
+    #startup-screen .startup-loader span {
+      display: block; width: 38%; height: 100%; border-radius: inherit;
+      background: linear-gradient(90deg,#9aa7f4,#5969d9);
+      animation: startup-critical-loading 1.35s ease-in-out infinite alternate;
+    }
+    #startup-screen .startup-message { margin-top: 13px; letter-spacing: 1.5px; }
+    @keyframes startup-critical-loading { from { transform: translateX(0); } to { transform: translateX(164px); } }
+    #startup-screen.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .42s ease, visibility .42s ease; }
+    @media (prefers-reduced-motion: reduce) { #startup-screen .startup-loader span { animation: none; } }
   </style>
+  <!-- 本体CSSは非同期で読み込み、最初の描画をブロックしない -->
   <link rel="preload" href="style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="style.css"></noscript>
 </head>
